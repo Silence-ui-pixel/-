@@ -12,6 +12,13 @@
 | `FORBIDDEN` | 403 | 没有权限执行此操作 | 角色权限不足（如对账需 MANAGER） |
 | `NOT_FOUND` | 404 | 数据不存在 | 查询的 id 不存在 |
 | `VALIDATION_ERROR` | 422 | 参数不合法 | 请求体校验失败 |
+| `BAD_REQUEST` | 400 | 请求不合法 | 参数语义错误但未触发字段校验 |
+| `METHOD_NOT_ALLOWED` | 405 | 请求方法不允许 | 用错 HTTP 方法（如 DELETE 一个只读接口） |
+| `CONFLICT` | 409 | 操作冲突 | 未带业务错误码的通用冲突 |
+| `TOO_MANY_REQUESTS` | 429 | 请求过于频繁 | 触发限流 |
+| `INTERNAL_ERROR` | 500 | 服务器内部错误 | 未捕获异常（前端应提示重试并上报） |
+| `SERVICE_UNAVAILABLE` | 503 | 服务暂不可用 | 依赖不可用（如数据库连不上） |
+| `HTTP_ERROR` | 其他 | 请求失败 | 上表未收录状态码的兜底 |
 
 ## 商品
 
@@ -64,5 +71,44 @@
 
 **约定**：
 - `code` + `message` 永远存在
+- `detail` **永远是 object**（没有附加信息时是 `{}`，不是 `null`）—— 前端可以直接点取字段，不用判空
 - `detail` 是结构化附加信息，**不同错误码的 detail 字段不同**（见各接口的 409 说明）
 - 前端判断逻辑用 `code`，展示文案优先用 `message`，复杂场景用 `detail` 拼装
+
+---
+
+## 实现保证：所有异常都是这个格式
+
+后端在 `api/app/main.py` 注册了三个异常处理器，**没有任何一条错误路径能绕过**：
+
+| 异常来源 | 处理器 | 举例 |
+|---|---|---|
+| `DomainError`（业务） | `handle_domain_error` | 库存不足、状态机不允许 |
+| `HTTPException`（框架/路由） | `handle_http_exception` | 401 未登录、403 权限、404 不存在、405 方法错、503 依赖挂了 |
+| `RequestValidationError`（Pydantic） | `handle_validation_error` | 请求体缺字段、类型不对 |
+
+状态码 → 错误码的映射表在 `api/app/core/errors.py` 的 `HTTP_STATUS_TO_CODE`，
+**改码表必须同步改本文件**。
+
+### 422 的 `detail` 结构（前端标红具体输入框用）
+
+```json
+{
+  "code": "VALIDATION_ERROR",
+  "message": "参数不合法",
+  "detail": {
+    "errors": [
+      { "loc": ["body", "lines"], "msg": "Field required", "type": "missing" }
+    ]
+  }
+}
+```
+
+- `loc`：字段路径数组，`["body","lines"]` 表示请求体里的 `lines` 字段
+- `msg`：英文原文（开发排查用，不要直接展示给用户）
+- `type`：错误类别（`missing` / `greater_than` / `string_type` 等）
+- 给用户看的永远是顶层 `message`
+
+> 注意区分：**路由里手工抛的 422**（如「实收数量不能为负数」）走 `HTTPException`
+> 分支，`message` 就是那句中文；**Pydantic 校验失败**走 `VALIDATION_ERROR` 分支，
+> `message` 固定「参数不合法」，具体原因在 `detail.errors`。

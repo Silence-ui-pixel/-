@@ -28,4 +28,7 @@ def test_health_db_returns_503_when_db_down():
     resp = client.get(f"{settings.api_prefix}/health/db")
     assert resp.status_code in (200, 503)
     if resp.status_code == 503:
-        assert "database unavailable" in resp.json()["detail"]
+        body = resp.json()
+        # 错误体统一为契约结构，探测脚本据此区分「依赖挂了」和「服务崩了」
+        assert body["code"] == "SERVICE_UNAVAILABLE"
+        assert "database unavailable" in body["message"]

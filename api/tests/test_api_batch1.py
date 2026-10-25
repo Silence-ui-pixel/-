@@ -3,8 +3,11 @@
 验证这些接口能正确工作，且与契约的响应结构一致。
 """
 
+import uuid
+
 import pytest
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import text
 
 from app.main import app
 
@@ -128,3 +131,55 @@ async def test_recon_manager(client):
     resp = await client.get("/api/v1/inventory/recon", headers={"Authorization": f"Bearer {token}"})
     assert resp.status_code == 200
     assert "items" in resp.json()
+
+
+async def test_inventory_item_includes_spec(client, session):
+    """库存项必须带 spec（规格）。
+
+    B 联调反馈：库存查询页想显示规格，但 InventoryItem 里没这个字段，
+    只能显示编码 + 名称。契约只增字段、不改语义，老调用方不受影响。
+
+    走真实链路造数（建单 -> 收货 -> 查库存），顺带覆盖「收货后立刻可查」
+    这条前端最依赖的路径。
+    """
+    token = await _login(client)
+    auth = {"Authorization": f"Bearer {token}"}
+    sku_id = (
+        await session.execute(text("select id from sku where sku_code = 'SKU-1001'"))
+    ).scalar_one()
+    batch = "SPEC-" + uuid.uuid4().hex[:8]
+
+    created = await client.post(
+        "/api/v1/inbound-orders",
+        json={"order_type": "PO", "lines": [{"sku_id": sku_id, "qty_required": 5}]},
+        headers=auth,
+    )
+    assert created.status_code == 201, created.text
+    order = created.json()
+
+    recv = await client.post(
+        f"/api/v1/inbound-orders/{order['id']}/receive",
+        json={
+            "lines": [
+                {
+                    "line_id": order["lines"][0]["id"],
+                    "qty_actual": 5,
+                    "batch_no": batch,
+                    "expiry_date": "2027-06-30",
+                }
+            ]
+        },
+        headers=auth,
+    )
+    assert recv.status_code == 200, recv.text
+
+    resp = await client.get(f"/api/v1/inventory?batch_no={batch}", headers=auth)
+    assert resp.status_code == 200
+    items = resp.json()["items"]
+    assert items, "刚收的货应该立刻能查到库存"
+    item = items[0]
+    assert "spec" in item, f"InventoryItem 缺 spec 字段，实际字段: {sorted(item)}"
+    assert item["spec"] == "550ml*24/箱"
+    # 顺带确认基础字段没被这次改动影响
+    assert item["sku_code"] == "SKU-1001"
+    assert item["qty_on_hand"] == 5

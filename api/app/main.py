@@ -1,5 +1,7 @@
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api.v1 import (
     agent,
@@ -11,7 +13,11 @@ from app.api.v1 import (
     skus,
 )
 from app.core.config import settings
-from app.core.errors import DomainError
+from app.core.errors import (
+    DomainError,
+    clean_validation_errors,
+    code_for_status,
+)
 
 
 def create_app() -> FastAPI:
@@ -38,6 +44,57 @@ def create_app() -> FastAPI:
                 "code": exc.code,
                 "message": exc.message,
                 "detail": exc.detail,
+            },
+        )
+
+    @app.exception_handler(StarletteHTTPException)
+    async def handle_http_exception(
+        request: Request, exc: StarletteHTTPException
+    ) -> JSONResponse:
+        """把 Starlette/FastAPI 的内置 HTTPException 也转成契约 Error 结构。
+
+        覆盖 401（鉴权依赖）/ 403（角色不足）/ 404（资源不存在）/
+        405 / 503 等所有非业务异常。
+
+        为什么必须做：这些异常原本返回 { "detail": "..." }，前端拿不到 code，
+        就只能靠 HTTP 状态码硬编码判断 —— token 过期无法自动跳登录、
+        缺货无法弹明细。契约的 Error schema 是所有错误的唯一出口。
+        """
+        code = code_for_status(exc.status_code)
+        raw = exc.detail
+        message = str(raw)
+        detail: dict = {}
+
+        if isinstance(raw, dict):
+            # 允许路由用 HTTPException(409, {"code": ..., "message": ...}) 传结构化信息，
+            # 但仍优先保留状态码映射出的 code（避免有人随手写错码）
+            message = str(raw.get("message", message))
+            if isinstance(raw.get("detail"), dict):
+                detail = raw["detail"]
+
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"code": code, "message": message, "detail": detail},
+            # 关键：401 的 WWW-Authenticate 等响应头必须原样带出，
+            # 否则客户端无法得知该用哪种认证方式
+            headers=getattr(exc, "headers", None),
+        )
+
+    @app.exception_handler(RequestValidationError)
+    async def handle_validation_error(
+        request: Request, exc: RequestValidationError
+    ) -> JSONResponse:
+        """请求体/查询参数校验失败 -> 422 VALIDATION_ERROR。
+
+        detail.errors 保留 Pydantic 的字段级信息（loc/msg/type），
+        前端才能标红具体哪个输入框，而不是只显示「参数不合法」。
+        """
+        return JSONResponse(
+            status_code=422,
+            content={
+                "code": "VALIDATION_ERROR",
+                "message": "参数不合法",
+                "detail": {"errors": clean_validation_errors(exc.errors())},
             },
         )
 

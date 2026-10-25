@@ -228,7 +228,10 @@ async def test_receive_requires_batch_for_batch_managed(client, session, clean_a
         headers=_auth(token),
     )
     assert resp.status_code == 422
-    assert "批次" in resp.json()["detail"]
+    err = resp.json()
+    # 契约：所有错误体统一 { code, message, detail }（见 contracts/errors.md）
+    assert err["code"] == "VALIDATION_ERROR"
+    assert "批次" in err["message"]
 
 
 async def test_receive_twice_returns_conflict(client, session, clean_all):

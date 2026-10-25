@@ -85,7 +85,18 @@ cmd_db_check() {
   fi
 }
 
+schema_ready() {
+  # 首启最常见的坑：容器起来了、接口也 200，但库是空的 —— 一登录就 500
+  # `relation "app_user" does not exist`。这时必须先跑 db-init。
+  local n
+  n=$(docker compose exec -T db psql -tAq -U "$DB_USER" -d "$DB_NAME" \
+        -c "select count(*) from information_schema.tables
+            where table_schema='public' and table_name='app_user';" 2>/dev/null | tr -d '\r' || true)
+  [ "${n:-0}" = "1" ]
+}
+
 cmd="${1:-help}"
+
 shift || true
 
 case "$cmd" in
@@ -96,6 +107,10 @@ case "$cmd" in
     docker compose up -d "$@"
     wait_api || true
     c_ok "完成。文档：http://127.0.0.1:${API_PORT}/docs"
+    if ! schema_ready; then
+      c_warn "⚠ 数据库还没初始化（表不存在）。现在直接调接口会 500，先执行："
+      c_warn "    bash scripts/dev.sh db-init"
+    fi
     ;;
 
   down)

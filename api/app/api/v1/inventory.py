@@ -73,6 +73,7 @@ async def list_inventory(
             sku_id=inv.sku_id,
             sku_code=sku.sku_code,
             sku_name=sku.name,
+            spec=sku.spec,
             location_id=inv.location_id,
             location_code=loc.location_code,
             location_type=loc.location_type,

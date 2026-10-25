@@ -118,3 +118,76 @@ class InventoryInsufficient(DomainError):
             message="可用库存不足",
             detail=detail,
         )
+
+
+# ---------------------------------------------------------------------------
+# 非业务异常的错误码映射
+# ---------------------------------------------------------------------------
+# 为什么需要这段：业务错误抛 DomainError 能带上 code，但路由里还有大量
+# `raise HTTPException(404, "入库单不存在")`，以及 FastAPI 自己的
+# 401/403/404/422（鉴权依赖、路径校验、Pydantic 请求体校验）。
+# 这些原本返回 { "detail": "..." }，前端拿不到 code，无法按错误类型分流。
+#
+# 映射表放在这里而不是 main.py：错误码体系的唯一真源在 errors.py，
+# 改码表必须同步改 contracts/errors.md。main.py 只负责装配。
+
+HTTP_STATUS_TO_CODE: dict[int, str] = {
+    400: "BAD_REQUEST",
+    401: "UNAUTHORIZED",
+    403: "FORBIDDEN",
+    404: "NOT_FOUND",
+    405: "METHOD_NOT_ALLOWED",
+    409: "CONFLICT",
+    422: "VALIDATION_ERROR",
+    429: "TOO_MANY_REQUESTS",
+    500: "INTERNAL_ERROR",
+    501: "NOT_IMPLEMENTED",
+    503: "SERVICE_UNAVAILABLE",
+}
+
+# 未收录的状态码用这个兜底，保证前端永远能拿到 code（不必自己判 HTTP）
+FALLBACK_CODE = "HTTP_ERROR"
+
+
+def code_for_status(status_code: int) -> str:
+    """HTTP 状态码 -> 契约错误码。"""
+    return HTTP_STATUS_TO_CODE.get(status_code, FALLBACK_CODE)
+
+
+# Pydantic 报错里 ctx 可能塞着 Exception 对象（如 ValueError），input 可能是
+# bytes —— 直接 JSONResponse 会抛 "not JSON serializable" 变成 500，
+# 把「参数错了」误导成「服务器崩了」。这里统一洗成可序列化的原始类型。
+_JSON_SCALARS = (str, int, float, bool, type(None))
+
+
+def _jsonable(value):
+    if isinstance(value, _JSON_SCALARS):
+        return value
+    if isinstance(value, (list, tuple)):
+        return [_jsonable(v) for v in value]
+    if isinstance(value, dict):
+        return {str(k): _jsonable(v) for k, v in value.items()}
+    return str(value)
+
+
+def clean_validation_errors(raw: list[dict]) -> list[dict]:
+    """把 Pydantic 的 errors() 洗成前端可直接消费、且一定可 JSON 序列化的结构。
+
+    保留 loc / msg / type / ctx / input 五个字段：
+      loc  -> 前端据此定位到具体字段（如 ["body", "lines"]）
+      msg  -> 开发排查用（英文原文）
+      type -> 判断错误类别（missing / greater_than 等）
+    """
+    cleaned: list[dict] = []
+    for err in raw:
+        item = {
+            "loc": list(err.get("loc", ())),
+            "msg": str(err.get("msg", "")),
+            "type": str(err.get("type", "")),
+        }
+        if "ctx" in err and err["ctx"]:
+            item["ctx"] = _jsonable(err["ctx"])
+        if "input" in err:
+            item["input"] = _jsonable(err["input"])
+        cleaned.append(item)
+    return cleaned

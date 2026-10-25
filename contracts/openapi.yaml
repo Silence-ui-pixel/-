@@ -217,6 +217,7 @@ components:
         sku_id: { type: integer }
         sku_code: { type: string }
         sku_name: { type: string }
+        spec: { type: string, nullable: true, description: 规格，如 "550ml*24/箱" }
         location_id: { type: integer }
         location_code: { type: string }
         location_type: { type: string }

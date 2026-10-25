@@ -126,6 +126,7 @@ class InventoryItem(BaseModel):
     sku_id: int
     sku_code: str
     sku_name: str
+    spec: str | None = None  # 规格；B 的库存查询页要显示这一列
     location_id: int
     location_code: str
     location_type: str
