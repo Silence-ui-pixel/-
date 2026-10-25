@@ -24,7 +24,12 @@ insert into app_user (username, display_name, password_hash, role) values
   ('op01',   '李操作员',   '$2b$12$5Z8W3kiy/PQgZnhPrfdgaO7v/ZnC4CMbnZqzi.CsucObNoxyVubNC', 'OPERATOR')
 on conflict (username) do nothing;
 
--- 库位：A 区 2 货架 x 3 层 x 2 位，加 1 个拣货位 + 1 个收货暂存位
+-- 库位：A 区 2 货架 x 3 层 x 2 位，加 1 个拣货位 + 1 个收货暂存位 + 1 个发货暂存位
+--
+-- 三个功能位的分工（对应作业流的三段「暂存」）：
+--   RECEIVING  收货暂存 —— 货到了但还没上架，账上算它的，但不算「可拣」
+--   STAGING    发货暂存 —— 已拣出但还没发运，仍在账上（账实一致的最后一环）
+--   PICKING    拣货位   —— 拆零拣货的黄金位，本次暂未用
 insert into location
   (zone_code, rack_code, level_no, bin_code, location_code, location_type, pick_seq, capacity_qty)
 values
@@ -35,7 +40,8 @@ values
   ('A','02',1,'01','WH01-A-02-01-01','STORAGE', 5, 600),
   ('A','02',1,'02','WH01-A-02-01-02','STORAGE', 6, 600),
   ('A','00',1,'01','WH01-A-00-01-01','PICKING', 0, 100),
-  ('R','00',1,'01','WH01-R-00-01-01','RECEIVING', null, 9999)
+  ('R','00',1,'01','WH01-R-00-01-01','RECEIVING', null, 9999),
+  ('S','00',1,'01','WH01-S-00-01-01','STAGING', null, 9999)
 on conflict (location_code) do nothing;
 
 -- 商品

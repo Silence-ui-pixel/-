@@ -122,9 +122,13 @@ async def test_tc02_insufficient(session, base_ids):
     assert float(inv.qty_allocated) == 20.0
     assert inv.version == 0  # 种子写入时 version 默认 0
 
-    # 断言 4：无脏流水
+    # 断言 4：无脏流水（排除种子期初流水 —— 期初是为了让对账视图一致才写的）
     cnt = (
-        await session.execute(select(func.count()).select_from(StockTxn))
+        await session.execute(
+            select(func.count())
+            .select_from(StockTxn)
+            .where(StockTxn.txn_no.notlike("SEED-%"))
+        )
     ).scalar_one()
     assert cnt == 0
 
@@ -188,9 +192,13 @@ async def test_tc03_concurrent(session, session_factory, base_ids):
     ).scalar_one()
     assert float(inv.qty_on_hand) == 2.0
 
-    # 断言 3：流水只有 1 行
+    # 断言 3：业务流水只有 1 行（排除种子期初流水）
     cnt = (
-        await session.execute(select(func.count()).select_from(StockTxn))
+        await session.execute(
+            select(func.count())
+            .select_from(StockTxn)
+            .where(StockTxn.txn_no.notlike("SEED-%"))
+        )
     ).scalar_one()
     assert cnt == 1
 
@@ -259,6 +267,13 @@ async def test_tc04_idempotent(session, base_ids):
 async def _seed_inventory(
     session, sku_id: int, location_id: int, batch: str, on_hand: float, allocated: float
 ):
+    """造前置库存：余额 + 期初流水成对写入。
+
+    必须同时写 stock_txn，否则对账视图 v_inventory_recon 会立刻报
+    MISMATCH / ONLY_INVENTORY —— 这正是该视图的作用：抓出任何「只改余额
+    不记流水」的代码。测试也不该破坏这条不变量，否则测试跑完数据库就是脏的，
+    后面的人工排查会被这条假异常带偏。
+    """
     inv = Inventory(
         sku_id=sku_id,
         location_id=location_id,
@@ -269,4 +284,22 @@ async def _seed_inventory(
         version=0,
     )
     session.add(inv)
+    await session.flush()
+
+    session.add(
+        StockTxn(
+            txn_no=f"SEED-{sku_id}-{location_id}-{batch}",
+            txn_type="RECEIPT",
+            sku_id=sku_id,
+            location_id=location_id,
+            batch_no=batch,
+            expiry_date=SENTINEL_EXPIRY,
+            on_hand_delta=on_hand,
+            allocated_delta=allocated,
+            before_on_hand=0,
+            after_on_hand=on_hand,
+            source="IMPORT",
+            remark="测试前置数据",
+        )
+    )
     await session.flush()

@@ -1,19 +1,30 @@
-"""入库单 CRUD：列表 / 建单 / 详情 / 改明细 / 取消。
+"""入库单：CRUD + 收货 + 上架。
 
-收货（receive）、上架（putaway）属第 3 批（走 apply_txn），本文件不含。
-状态机：DRAFT → ARRIVED → RECEIVING → RECEIVED → PUTAWAY → DONE；
-取消仅允许 DRAFT / ARRIVED。
+状态机（数据库 CHECK 约束一致）：
+    DRAFT → ARRIVED → RECEIVING → RECEIVED → PUTAWAY → DONE
+    取消仅允许 DRAFT / ARRIVED
+
+作业与库存的对应关系（都走 stock_service.apply_txn，绝不直接改 inventory）：
+    收货 RECEIPT      货进 RECEIVING 暂存位，on_hand += 实收
+    上架 TRANSFER_OUT + PUTAWAY
+                      从 RECEIVING 移出、落到 STORAGE 存储位，两条流水同一事务
+
+为什么上架要写两条流水而不是一条：
+    库存余额是「按库位」记的。一次移库必然有一条出、一条进。
+    只写一条会让暂存位的账一直虚增（货已经走了但账上还挂着），
+    几天后对账视图就会报 MISMATCH。
 """
 
 import uuid
-from datetime import date
+from datetime import UTC, date, datetime
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.errors import DomainError, InvalidStatusTransition
 from app.core.security import get_current_user
-from app.db.models import InboundOrder, OrderLine, Sku
+from app.db.models import SENTINEL_EXPIRY, InboundOrder, Location, OrderLine, Sku
 from app.db.session import get_session
 from app.schemas import (
     InboundOrder as InboundOrderSchema,
@@ -24,15 +35,31 @@ from app.schemas import (
     InboundOrderListResponse,
     LineUpdate,
     PageMeta,
+    PutawayRequest,
+    ReceiveRequest,
 )
 from app.schemas import (
     OrderLine as OrderLineSchema,
 )
+from app.services.location_service import get_receiving_location, pick_putaway_target
+from app.services.stock_service import apply_txn
 
 router = APIRouter(prefix="/inbound-orders", dependencies=[Depends(get_current_user)])
 
 # 入库单允许取消的状态
 _CANCELLABLE = {"DRAFT", "ARRIVED"}
+# 允许收货的状态
+_RECEIVABLE = {"DRAFT", "ARRIVED", "RECEIVING"}
+# 允许上架的状态
+_PUTAWAYABLE = {"RECEIVING", "RECEIVED"}
+
+
+def _source_of(agent_run_id: str | None) -> str:
+    """流水来源：带 Agent 治理头就记 AGENT，否则记 WEB。
+
+    这是审计链的起点 —— 以后能回答「这笔库存变动是人点的还是 Agent 建议的」。
+    """
+    return "AGENT" if agent_run_id else "WEB"
 
 
 def _gen_order_no(prefix: str = "IN") -> str:
@@ -212,12 +239,277 @@ async def cancel_inbound_order(
 ) -> InboundOrderDetail:
     order = await _get_order(session, order_id)
     if order.status not in _CANCELLABLE:
-        raise HTTPException(status_code=409, detail=f"状态 {order.status} 不允许取消")
+        raise InvalidStatusTransition(
+            order_no=order.order_no,
+            current_status=order.status,
+            action="取消入库单",
+            allowed_statuses=sorted(_CANCELLABLE),
+        )
 
     order.status = "CANCELLED"
     await session.commit()
     await session.refresh(order)
 
+    lines = await _get_lines(session, order.id)
+    return InboundOrderDetail(
+        **InboundOrderSchema.model_validate(order).model_dump(),
+        lines=[_to_line_schema(line, sku) for line, sku in lines],
+    )
+
+
+# ---------------------------------------------------------------------------
+# 核心作业：收货
+# ---------------------------------------------------------------------------
+@router.post(
+    "/{order_id}/receive",
+    response_model=InboundOrderDetail,
+    summary="收货（写暂存位，走 apply_txn RECEIPT）",
+)
+async def receive_inbound_order(
+    order_id: int,
+    body: ReceiveRequest,
+    current: dict = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
+    agent_run_id: str | None = Header(default=None, alias="X-Agent-Run-Id"),
+) -> InboundOrderDetail:
+    """收货：实物进仓库，记到 RECEIVING 暂存位。
+
+    设计要点：
+    1. 货进「暂存位」而不是直接进存储位 —— 因为还没上架，位置未定。
+       但账上必须有它，否则「仓库里有一堆货，系统说没有」，这是最典型的账实不符。
+    2. 一次收货完成整单（状态直接到 RECEIVED）。支持部分收货会导致同一明细
+       产生多条 RECEIPT 流水，txn_no 无法再天然幂等，Sprint 1 不做。
+    3. 允许超收（供应商多发）。schema 的 ck_line_out_qty 明确只约束出库超拣，
+       入库超收是真实业务场景，拦掉会让作业员没法录真实数量。
+
+    幂等：txn_no = RECEIPT-{order_id}-{line_id}，同一明细天然只能成功一次；
+    Idempotency-Key 头用于挡住 PDA 弱网重试造成的重复请求。
+    """
+    order = await _get_order(session, order_id)
+    if order.status not in _RECEIVABLE:
+        raise InvalidStatusTransition(
+            order_no=order.order_no,
+            current_status=order.status,
+            action="收货",
+            allowed_statuses=sorted(_RECEIVABLE),
+        )
+
+    # 明细必须属于本单，否则可能被用来改别的单
+    all_lines = {line.id: (line, sku) for line, sku in await _get_lines(session, order.id)}
+    if not body.lines:
+        raise HTTPException(status_code=422, detail="收货明细不能为空")
+
+    receiving = await get_receiving_location(session)
+    now = datetime.now(UTC)
+    total_received = 0.0
+
+    for item in body.lines:
+        pair = all_lines.get(item.line_id)
+        if pair is None:
+            raise HTTPException(
+                status_code=422,
+                detail=f"明细 {item.line_id} 不属于本入库单",
+            )
+        line, sku = pair
+
+        if item.qty_actual < 0:
+            raise HTTPException(status_code=422, detail="实收数量不能为负数")
+        if item.qty_rejected < 0:
+            raise HTTPException(status_code=422, detail="不良数量不能为负数")
+
+        # 批次管理商品必须给批次号，否则批次追溯直接断链
+        batch_no = (item.batch_no or "").strip()
+        if sku.is_batch_managed and not batch_no:
+            raise HTTPException(
+                status_code=422,
+                detail=f"商品 {sku.sku_code} 是批次管理商品，收货必须提供批次号",
+            )
+
+        expiry = item.expiry_date or SENTINEL_EXPIRY
+        qty_in = float(item.qty_actual)
+
+        if qty_in > 0:
+            await apply_txn(
+                session,
+                txn_no=f"RECEIPT-{order.id}-{line.id}",
+                txn_type="RECEIPT",
+                sku_id=line.sku_id,
+                location_id=receiving.id,
+                batch_no=batch_no,
+                expiry_date=expiry,
+                on_hand_delta=qty_in,
+                ref_type="INBOUND",
+                ref_id=order.id,
+                ref_line_id=line.id,
+                source=_source_of(agent_run_id),
+                operator_id=current["id"],
+                agent_run_id=agent_run_id,
+                remark=f"收货 {order.order_no}",
+            )
+
+        line.qty_actual = qty_in
+        line.qty_rejected = float(item.qty_rejected or 0)
+        line.batch_no = batch_no
+        line.expiry_date = expiry
+        # 实收为 0 的明细直接终结（供应商没发这一项），避免留在 OPEN 卡住后续流程
+        line.status = "DONE" if qty_in > 0 else "CANCELLED"
+        total_received += qty_in
+
+    order.total_received_qty = total_received
+    order.received_at = now
+    order.status = "RECEIVED"
+    order.version = (order.version or 0) + 1
+
+    try:
+        await session.commit()
+    except DomainError:
+        await session.rollback()
+        raise
+
+    await session.refresh(order)
+    lines = await _get_lines(session, order.id)
+    return InboundOrderDetail(
+        **InboundOrderSchema.model_validate(order).model_dump(),
+        lines=[_to_line_schema(line, sku) for line, sku in lines],
+    )
+
+
+# ---------------------------------------------------------------------------
+# 核心作业：上架
+# ---------------------------------------------------------------------------
+@router.post(
+    "/{order_id}/putaway",
+    response_model=InboundOrderDetail,
+    summary="上架（走 apply_txn PUTAWAY）",
+)
+async def putaway_inbound_order(
+    order_id: int,
+    body: PutawayRequest,
+    current: dict = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
+    agent_run_id: str | None = Header(default=None, alias="X-Agent-Run-Id"),
+) -> InboundOrderDetail:
+    """上架：把已收货的货从暂存位移到存储位。
+
+    一次移库写两条流水（同一事务）：
+        RECEIVING 位  TRANSFER_OUT  on_hand -= 数量
+        目标存储位    PUTAWAY       on_hand += 数量
+
+    为什么要两条：库存余额按库位记。只写出、不写进，货就在账上消失了；
+    只写进、不写出，暂存位会一直虚增。两种都会让对账视图报异常。
+
+    目标位：body 里指定优先；没指定就按 location_service 的策略自动选
+    （优先合并到已有同 SKU 的存储位，减少碎片）。
+    """
+    order = await _get_order(session, order_id)
+    if order.status not in _PUTAWAYABLE:
+        raise InvalidStatusTransition(
+            order_no=order.order_no,
+            current_status=order.status,
+            action="上架",
+            allowed_statuses=sorted(_PUTAWAYABLE),
+        )
+
+    all_lines = {line.id: (line, sku) for line, sku in await _get_lines(session, order.id)}
+    receiving = await get_receiving_location(session)
+
+    # 未指定明细时，处理所有「已收货但未指定目标位」的行
+    requested: dict[int, int | None] = {}
+    if body.lines:
+        for item in body.lines:
+            if item.line_id not in all_lines:
+                raise HTTPException(
+                    status_code=422, detail=f"明细 {item.line_id} 不属于本入库单"
+                )
+            requested[item.line_id] = item.to_location_id
+    else:
+        requested = {
+            line.id: None
+            for line, _sku in all_lines.values()
+            if float(line.qty_actual) > 0 and line.to_location_id is None
+        }
+
+    for line_id, explicit_target in requested.items():
+        line, _sku = all_lines[line_id]
+        qty = float(line.qty_actual)
+        if qty <= 0:
+            continue
+        if line.to_location_id is not None:
+            # 已经上架过，跳过（幂等：重复请求不会重复移库）
+            continue
+
+        if explicit_target is not None:
+            target = await session.get(Location, explicit_target)
+            if target is None:
+                raise HTTPException(status_code=422, detail=f"目标库位 {explicit_target} 不存在")
+            if target.location_type != "STORAGE":
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"目标库位 {target.location_code} 不是存储位，不能上架到该处",
+                )
+        else:
+            target = await pick_putaway_target(
+                session, sku_id=line.sku_id, exclude_location_id=receiving.id
+            )
+
+        # 1) 从暂存位移出（同一维度：sku + 批次 + 效期）
+        await apply_txn(
+            session,
+            txn_no=f"PUTAWAY-OUT-{order.id}-{line.id}",
+            txn_type="TRANSFER_OUT",
+            sku_id=line.sku_id,
+            location_id=receiving.id,
+            batch_no=line.batch_no,
+            expiry_date=line.expiry_date,
+            on_hand_delta=-qty,
+            ref_type="INBOUND",
+            ref_id=order.id,
+            ref_line_id=line.id,
+            source=_source_of(agent_run_id),
+            operator_id=current["id"],
+            agent_run_id=agent_run_id,
+            remark=f"上架移出 {order.order_no}",
+        )
+        # 2) 落到存储位
+        await apply_txn(
+            session,
+            txn_no=f"PUTAWAY-IN-{order.id}-{line.id}",
+            txn_type="PUTAWAY",
+            sku_id=line.sku_id,
+            location_id=target.id,
+            batch_no=line.batch_no,
+            expiry_date=line.expiry_date,
+            on_hand_delta=qty,
+            ref_type="INBOUND",
+            ref_id=order.id,
+            ref_line_id=line.id,
+            source=_source_of(agent_run_id),
+            operator_id=current["id"],
+            agent_run_id=agent_run_id,
+            remark=f"上架到 {target.location_code}",
+        )
+
+        line.to_location_id = target.id
+        line.status = "DONE"
+
+    # 全单所有已收明细都上架完 → DONE；否则 PUTAWAY（还在进行中）
+    pending = [
+        line
+        for line, _sku in all_lines.values()
+        if float(line.qty_actual) > 0 and line.to_location_id is None
+    ]
+    order.status = "DONE" if not pending else "PUTAWAY"
+    order.version = (order.version or 0) + 1
+
+    try:
+        await session.commit()
+    except DomainError:
+        await session.rollback()
+        raise
+
+    await session.refresh(order)
     lines = await _get_lines(session, order.id)
     return InboundOrderDetail(
         **InboundOrderSchema.model_validate(order).model_dump(),

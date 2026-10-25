@@ -240,3 +240,56 @@ class OutboundOrderDetail(OutboundOrder):
 class OutboundOrderListResponse(BaseModel):
     items: list[OutboundOrder]
     meta: PageMeta
+
+
+# ---------- 作业请求（第 3 批：收货/上架/分配/拣货/发运） ----------
+class ReceiveLine(BaseModel):
+    line_id: int
+    qty_actual: float
+    qty_rejected: float = 0
+    batch_no: str | None = None
+    expiry_date: date | None = None
+
+
+class ReceiveRequest(BaseModel):
+    lines: list[ReceiveLine]
+
+
+class PutawayLine(BaseModel):
+    line_id: int
+    to_location_id: int | None = None
+
+
+class PutawayRequest(BaseModel):
+    lines: list[PutawayLine] | None = None
+
+
+class PickConfirmLine(BaseModel):
+    line_id: int
+    qty_actual: float
+    qty_rejected: float = 0
+
+
+class PickConfirmRequest(BaseModel):
+    lines: list[PickConfirmLine]
+
+
+class ShipRequest(BaseModel):
+    carrier: str | None = None
+    tracking_no: str | None = None
+
+
+class PickLine(BaseModel):
+    line_id: int
+    sku_id: int
+    sku_code: str
+    sku_name: str
+    location_id: int | None = None
+    location_code: str
+    qty_required: float
+    batch_no: str
+    expiry_date: date
+
+
+class PickPlanResponse(BaseModel):
+    lines: list[PickLine]
