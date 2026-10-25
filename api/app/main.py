@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
@@ -27,6 +28,17 @@ def create_app() -> FastAPI:
         description="仓储智能管理 Agent 系统 · 领域与账务服务",
         docs_url="/docs",
         redoc_url=None,
+    )
+
+    # CORS：前端（Vite 5173）跨域访问后端（8000）必需。
+    # 没有它，浏览器的 OPTIONS 预检会被 405 拦下，登录等一切 POST 都会被浏览器阻断。
+    # 开发期放开 origin，正式部署前要收紧为白名单（见 CONTRACT-FREEZE 的安全项）。
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=False,
+        allow_methods=["*"],
+        allow_headers=["*"],
     )
 
     @app.exception_handler(DomainError)
