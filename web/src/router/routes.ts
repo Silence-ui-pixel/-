@@ -266,6 +266,19 @@ export const routes: AppRouteRecord[] = [
           roles: ['ADMIN', 'MANAGER', 'OPERATOR'],
         },
       },
+      {
+        // PDA 库存速查（只读）：扫/输 SKU 条码 → 精简列表
+        path: 'inventory',
+        name: 'pda-inventory',
+        component: () => import('@/views/pda/inventory/index.vue'),
+        meta: {
+          title: '库存速查',
+          icon: 'Search',
+          layout: 'pda',
+          keepAlive: false,
+          roles: ['ADMIN', 'MANAGER', 'OPERATOR', 'VIEWER'],
+        },
+      },
     ],
   },
 

@@ -1,8 +1,75 @@
 // =============================================================================
-// 从 db/schema(1).sql 反推的领域类型（临时占位）
-// 说明：等 A 产出 openapi.yaml 后，用 `npm run gen` 生成的正式类型覆盖本文件。
-// 字段口径以 schema.sql 注释为准。
+// 类型定义统一出口
+// -----------------------------------------------------------------------------
+// 本文件分两部分：
+//   1. 后端业务模型：来自 OpenAPI 契约（contracts/openapi.yaml），经
+//      openapi-typescript 生成于 `src/api/schema.d.ts`，这里具名 re-export，
+//      业务代码统一从这里 import。契约冻结后「只增字段、不改语义」。
+//      字段为 snake_case（与数据库列名一致），多为可选（?）。
+//   2. 前端专属类型：UserRole、AppRouteMeta（路由 / 权限），不属于后端契约，
+//      保留手写，不随契约生成。
+//
+// 重新生成契约类型：`npm run gen:api`（契约变更由 A 通知后再执行）。
 // =============================================================================
+
+import type { components } from '@/api/schema'
+
+type Schema = components['schemas']
+
+// ---------------------------------------------------------------------------
+// 1. 后端契约 schema（具名 re-export）
+// ---------------------------------------------------------------------------
+
+/** 统一错误响应 { code, message, detail }（契约原名 Error，此处避免与全局 Error 混淆） */
+export type ApiError = Schema['Error']
+/** 分页元信息 { total, page, page_size } */
+export type PageMeta = Schema['PageMeta']
+
+export type LoginRequest = Schema['LoginRequest']
+export type LoginResponse = Schema['LoginResponse']
+
+/** 用户（role 与下方 UserRole 值域一致） */
+export type User = Schema['User']
+
+export type Sku = Schema['Sku']
+export type SkuCreate = Schema['SkuCreate']
+export type SkuUpdate = Schema['SkuUpdate']
+export type SkuListResponse = Schema['SkuListResponse']
+
+export type Location = Schema['Location']
+export type LocationListResponse = Schema['LocationListResponse']
+
+/** 库存余额（含 sku/location 联表展示字段；qty_available 为生成列，只读） */
+export type InventoryItem = Schema['InventoryItem']
+export type InventoryListResponse = Schema['InventoryListResponse']
+
+export type StockTxnItem = Schema['StockTxnItem']
+export type StockTxnListResponse = Schema['StockTxnListResponse']
+export type ReconItem = Schema['ReconItem']
+
+export type InboundOrder = Schema['InboundOrder']
+export type InboundOrderDetail = Schema['InboundOrderDetail']
+export type InboundOrderCreate = Schema['InboundOrderCreate']
+export type ReceiveRequest = Schema['ReceiveRequest']
+export type PutawayRequest = Schema['PutawayRequest']
+
+export type OutboundOrder = Schema['OutboundOrder']
+export type OutboundOrderDetail = Schema['OutboundOrderDetail']
+export type OutboundOrderCreate = Schema['OutboundOrderCreate']
+export type PickLine = Schema['PickLine']
+export type PickPlanResponse = Schema['PickPlanResponse']
+export type PickConfirmRequest = Schema['PickConfirmRequest']
+export type ShipRequest = Schema['ShipRequest']
+
+export type OrderLine = Schema['OrderLine']
+
+export type AgentQueryRequest = Schema['AgentQueryRequest']
+export type AgentQueryResponse = Schema['AgentQueryResponse']
+export type AgentSuggestion = Schema['AgentSuggestion']
+
+// ---------------------------------------------------------------------------
+// 2. 前端专属类型（路由 / 权限，非后端契约）
+// ---------------------------------------------------------------------------
 
 /** 用户角色枚举（权限由低到高：VIEWER < OPERATOR < MANAGER < ADMIN） */
 export type UserRole = 'ADMIN' | 'MANAGER' | 'OPERATOR' | 'VIEWER'
@@ -26,217 +93,4 @@ export interface AppRouteMeta {
   keepAlive?: boolean
   /** 是否为公开页（无需登录即可访问，如登录页） */
   public?: boolean
-}
-
-/** 用户 */
-export interface AppUser {
-  id: number
-  username: string
-  displayName: string
-  role: UserRole
-  status: 0 | 1
-  lastLoginAt?: string
-  createdAt: string
-  updatedAt: string
-}
-
-/** 商品主数据 */
-export interface Sku {
-  id: number
-  skuCode: string
-  barcode?: string
-  name: string
-  spec?: string
-  category?: string
-  baseUom: string
-  weightKg?: number
-  volumeM3?: number
-  shelfLifeDays?: number
-  abcClass?: 'A' | 'B' | 'C'
-  isBatchManaged: boolean
-  safetyStock: number
-  reorderPoint: number
-  status: 0 | 1
-  createdAt: string
-  updatedAt: string
-}
-
-/** 库位类型 */
-export type LocationType = 'STORAGE' | 'RECEIVING' | 'PICKING' | 'STAGING' | 'QUARANTINE'
-
-/** 库位 */
-export interface Location {
-  id: number
-  warehouseCode: string
-  zoneCode: string
-  rackCode: string
-  levelNo: number
-  binCode: string
-  locationCode: string
-  locationType: LocationType
-  pickSeq?: number
-  capacityQty?: number
-  capacityVolume?: number
-  isMixedSku: boolean
-  isMixedBatch: boolean
-  status: 0 | 1
-  createdAt: string
-  updatedAt: string
-}
-
-/**
- * 库存余额
- * 注意：qtyAvailable 是数据库生成列（generated always as ... stored），只读，前端禁止反算后提交。
- */
-export interface Inventory {
-  id: number
-  skuId: number
-  locationId: number
-  batchNo: string
-  expiryDate: string
-  /** 现有量（物理在库） */
-  qtyOnHand: number
-  /** 已分配量（被出库单锁定，未出库） */
-  qtyAllocated: number
-  /** 可用量 = 现有量 - 已分配量（只读） */
-  qtyAvailable: number
-  version: number
-  updatedAt: string
-}
-
-/** 库存流水类型 */
-export type TxnType =
-  | 'RECEIPT'
-  | 'PUTAWAY'
-  | 'PICK'
-  | 'SHIP'
-  | 'ADJUST'
-  | 'TRANSFER_IN'
-  | 'TRANSFER_OUT'
-  | 'COUNT_ADJUST'
-  | 'ALLOCATE'
-  | 'DEALLOCATE'
-
-/** 流水来源 */
-export type TxnSource = 'WEB' | 'PDA' | 'AGENT' | 'SYSTEM' | 'IMPORT'
-
-/** 库存流水（只追加账本） */
-export interface StockTxn {
-  id: number
-  txnNo: string
-  txnType: TxnType
-  skuId: number
-  locationId: number
-  batchNo: string
-  expiryDate: string
-  onHandDelta: number
-  allocatedDelta: number
-  beforeOnHand: number
-  afterOnHand: number
-  refType?: string
-  refId?: number
-  refLineId?: number
-  source: TxnSource
-  agentRunId?: string
-  operatorId?: number
-  remark?: string
-  createdAt: string
-}
-
-/** 入库单状态 */
-export type InboundStatus =
-  | 'DRAFT'
-  | 'ARRIVED'
-  | 'RECEIVING'
-  | 'RECEIVED'
-  | 'PUTAWAY'
-  | 'DONE'
-  | 'CANCELLED'
-
-/** 入库单头 */
-export interface InboundOrder {
-  id: number
-  orderNo: string
-  orderType: 'PO' | 'RETURN' | 'TRANSFER'
-  supplierName?: string
-  status: InboundStatus
-  expectedAt?: string
-  receivedAt?: string
-  totalExpectedQty: number
-  totalReceivedQty: number
-  remark?: string
-  createdBy?: number
-  version: number
-  createdAt: string
-  updatedAt: string
-}
-
-/** 出库单状态 */
-export type OutboundStatus = 'DRAFT' | 'ALLOCATED' | 'PICKING' | 'PICKED' | 'SHIPPED' | 'CANCELLED'
-
-/** 出库单头 */
-export interface OutboundOrder {
-  id: number
-  orderNo: string
-  orderType: 'SALE' | 'RETURN' | 'TRANSFER'
-  customerName?: string
-  status: OutboundStatus
-  priority: number
-  carrier?: string
-  trackingNo?: string
-  requestedShipAt?: string
-  shippedAt?: string
-  totalQty: number
-  remark?: string
-  createdBy?: number
-  version: number
-  createdAt: string
-  updatedAt: string
-}
-
-/** 单据明细状态 */
-export type LineStatus = 'OPEN' | 'ALLOCATED' | 'PARTIAL' | 'DONE' | 'CANCELLED'
-
-/** 单据明细（入库 / 出库共用，orderType 判别归属） */
-export interface OrderLine {
-  id: number
-  orderType: 'IN' | 'OUT'
-  inboundId?: number
-  outboundId?: number
-  lineNo: number
-  skuId: number
-  qtyRequired: number
-  qtyActual: number
-  qtyRejected: number
-  batchNo: string
-  expiryDate: string
-  fromLocationId?: number
-  toLocationId?: number
-  status: LineStatus
-  remark?: string
-  createdAt: string
-  updatedAt: string
-}
-
-// =============================================================================
-// 视图 / 组合类型（前端展示用，非数据库表）
-// =============================================================================
-
-/** 库存查询页：inventory 联 sku / location 后的展示行 */
-export interface InventoryRow extends Inventory {
-  skuCode: string
-  skuName: string
-  barcode?: string
-  baseUom: string
-  locationCode: string
-  zoneCode: string
-  isBatchManaged: boolean
-}
-
-/** 通用分页响应 */
-export interface PageResult<T> {
-  items: T[]
-  total: number
-  page: number
-  pageSize: number
 }
