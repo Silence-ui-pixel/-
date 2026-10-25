@@ -126,3 +126,24 @@
 - D3 当面评审（敲定默认列 + 冻结）
 
 ---
+
+## 2026-10-25 (D1 · S1-08 完成)
+
+**推进**
+- 产出 `contracts/openapi.yaml`（OpenAPI 3.1）：28 操作 / 32 schema，覆盖 24 条 S1 + 3 条 AI 预留 + login
+- 产出 `contracts/errors.md`：错误码枚举 + 中文提示 + 统一响应格式
+- api-list 复制到 `contracts/`，与 README 规划对齐
+- 规范校验通过（openapi-spec-validator），36 个引用无缺失
+
+**关键设计落进契约**
+- 幂等头 `Idempotency-Key`（receive/putaway/pick/ship 必须）、AI 治理头 `X-Agent-Run-Id`
+- 无 POST /inventory：库存唯一写入口在作业层，红线在契约层落地
+- O4 分配失败 409 detail 带 sku_code/batch_no/required/available/shortfall（与 TC-02 对齐）
+- 库存查询页加 location_type 筛选（B 采纳的「收货即落账」连带项）
+
+**明天第一步**
+- D3 当面评审（敲定「库存查询页默认列」→ 冻结契约）
+- 通知 B：契约就绪，可生成 TS 类型 + 搭 mock
+- A 进 P1：把 24 条接口落到 FastAPI 路由
+
+---

@@ -1,0 +1,1215 @@
+openapi: 3.1.0
+info:
+  title: 仓储智能管理 Agent 系统 API
+  version: 0.1.0
+  description: |
+    Sprint 1 最小闭环契约（收货 → 上架 → 查询 → 拣货 → 出库）。
+    本契约是前后端并行开发的唯一真源：B 据此生成 TS 类型、搭 mock，
+    A 据此实现后端。冻结后只增字段、不改语义。
+
+    ## 全局约定
+    - 前缀 `/api/v1`
+    - 认证 `Authorization: Bearer <jwt>`（除 login 外都需要）
+    - 分页 `?page=1&page_size=20`，最大 page_size=100
+    - 错误格式 `{ code, message, detail }`，HTTP 状态码 + 业务错误码双层
+    - 写操作支持 `Idempotency-Key` 请求头（receive/putaway/pick/ship 必须）
+    - AI 发起的写必须带 `X-Agent-Run-Id` 请求头
+    - 时间一律 ISO 8601 + UTC
+
+servers:
+  - url: http://localhost:8000/api/v1
+    description: 本地开发
+
+tags:
+  - name: auth
+    description: 认证
+  - name: sku
+    description: 商品主数据
+  - name: location
+    description: 库位
+  - name: inventory
+    description: 库存与流水
+  - name: inbound
+    description: 入库作业
+  - name: outbound
+    description: 出库作业
+  - name: agent
+    description: AI Agent（Sprint 1 占位，P2 实现）
+
+# ---------------------------------------------------------------------------
+# 通用组件
+# ---------------------------------------------------------------------------
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    page:
+      name: page
+      in: query
+      schema: { type: integer, minimum: 1, default: 1 }
+      description: 页码，从 1 开始
+    page_size:
+      name: page_size
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      description: 每页条数，最大 100
+    idempotency_key:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string }
+      description: 幂等键，业务单号+序号（如 SO-001-PICK）。PDA 弱网重试必需。
+    agent_run_id:
+      name: X-Agent-Run-Id
+      in: header
+      schema: { type: string }
+      description: AI 发起写操作时的会话/审批单 ID，用于审计追溯。
+
+  schemas:
+    # ---------- 通用 ----------
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          description: 机器可读错误码，如 INVENTORY_INSUFFICIENT
+        message:
+          type: string
+          description: 面向用户的中文提示
+        detail:
+          type: object
+          additionalProperties: true
+          description: 附加结构化信息（供前端展示/定位）
+
+    PageMeta:
+      type: object
+      properties:
+        total:
+          type: integer
+          description: 总条数
+        page:
+          type: integer
+        page_size:
+          type: integer
+
+    # ---------- 认证 ----------
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username: { type: string }
+        password: { type: string }
+
+    LoginResponse:
+      type: object
+      required: [access_token, token_type]
+      properties:
+        access_token: { type: string }
+        token_type: { type: string, default: bearer }
+
+    User:
+      type: object
+      properties:
+        id: { type: integer }
+        username: { type: string }
+        display_name: { type: string }
+        role:
+          type: string
+          enum: [ADMIN, MANAGER, OPERATOR, VIEWER]
+
+    # ---------- 商品 ----------
+    Sku:
+      type: object
+      properties:
+        id: { type: integer }
+        sku_code: { type: string }
+        barcode: { type: string, nullable: true }
+        name: { type: string }
+        spec: { type: string, nullable: true }
+        category: { type: string, nullable: true }
+        base_uom: { type: string }
+        weight_kg: { type: number, nullable: true }
+        volume_m3: { type: number, nullable: true }
+        shelf_life_days: { type: integer, nullable: true }
+        abc_class:
+          type: string
+          enum: [A, B, C]
+          nullable: true
+        is_batch_managed: { type: boolean }
+        safety_stock: { type: number }
+        reorder_point: { type: number }
+        status: { type: integer, enum: [0, 1] }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    SkuCreate:
+      type: object
+      required: [sku_code, name]
+      properties:
+        sku_code: { type: string }
+        barcode: { type: string, nullable: true }
+        name: { type: string }
+        spec: { type: string, nullable: true }
+        category: { type: string, nullable: true }
+        base_uom: { type: string, default: EA }
+        weight_kg: { type: number, nullable: true }
+        volume_m3: { type: number, nullable: true }
+        shelf_life_days: { type: integer, nullable: true }
+        abc_class: { type: string, enum: [A, B, C], nullable: true }
+        is_batch_managed: { type: boolean, default: false }
+        safety_stock: { type: number, default: 0 }
+        reorder_point: { type: number, default: 0 }
+
+    SkuUpdate:
+      type: object
+      properties:
+        name: { type: string }
+        spec: { type: string, nullable: true }
+        category: { type: string, nullable: true }
+        base_uom: { type: string }
+        shelf_life_days: { type: integer, nullable: true }
+        abc_class: { type: string, enum: [A, B, C], nullable: true }
+        is_batch_managed: { type: boolean }
+        safety_stock: { type: number }
+        reorder_point: { type: number }
+
+    SkuListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/Sku" }
+        meta: { $ref: "#/components/schemas/PageMeta" }
+
+    # ---------- 库位 ----------
+    Location:
+      type: object
+      properties:
+        id: { type: integer }
+        warehouse_code: { type: string }
+        zone_code: { type: string }
+        rack_code: { type: string }
+        level_no: { type: integer }
+        bin_code: { type: string }
+        location_code: { type: string }
+        location_type:
+          type: string
+          enum: [STORAGE, RECEIVING, PICKING, STAGING, QUARANTINE]
+        pick_seq: { type: integer, nullable: true }
+        status: { type: integer, enum: [0, 1] }
+
+    LocationListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/Location" }
+
+    # ---------- 库存 ----------
+    InventoryItem:
+      type: object
+      properties:
+        sku_id: { type: integer }
+        sku_code: { type: string }
+        sku_name: { type: string }
+        location_id: { type: integer }
+        location_code: { type: string }
+        location_type: { type: string }
+        batch_no: { type: string }
+        expiry_date: { type: string, format: date }
+        qty_on_hand: { type: number, description: 现有库存（账面总量） }
+        qty_allocated: { type: number, description: 已分配（锁定）量 }
+        qty_available: { type: number, description: 可用库存 = 现有 - 锁定 }
+        base_uom: { type: string }
+
+    InventoryListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/InventoryItem" }
+        meta: { $ref: "#/components/schemas/PageMeta" }
+
+    StockTxnItem:
+      type: object
+      properties:
+        id: { type: integer }
+        txn_no: { type: string }
+        txn_type:
+          type: string
+          enum: [RECEIPT, PUTAWAY, PICK, SHIP, ADJUST, TRANSFER_IN, TRANSFER_OUT, COUNT_ADJUST, ALLOCATE, DEALLOCATE]
+        sku_id: { type: integer }
+        sku_code: { type: string }
+        location_code: { type: string }
+        batch_no: { type: string }
+        expiry_date: { type: string, format: date }
+        on_hand_delta: { type: number }
+        allocated_delta: { type: number }
+        before_on_hand: { type: number }
+        after_on_hand: { type: number }
+        ref_type: { type: string, nullable: true }
+        ref_id: { type: integer, nullable: true }
+        source:
+          type: string
+          enum: [WEB, PDA, AGENT, SYSTEM, IMPORT]
+        agent_run_id: { type: string, nullable: true }
+        operator_id: { type: integer, nullable: true }
+        remark: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+
+    StockTxnListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/StockTxnItem" }
+        meta: { $ref: "#/components/schemas/PageMeta" }
+
+    ReconItem:
+      type: object
+      properties:
+        sku_id: { type: integer, nullable: true }
+        location_id: { type: integer, nullable: true }
+        batch_no: { type: string }
+        expiry_date: { type: string, format: date }
+        inv_on_hand: { type: number }
+        txn_on_hand: { type: number }
+        diff_on_hand: { type: number }
+        recon_status:
+          type: string
+          enum: [OK, MISMATCH, ONLY_INVENTORY, ONLY_TXN]
+
+    # ---------- 入库 ----------
+    InboundOrder:
+      type: object
+      properties:
+        id: { type: integer }
+        order_no: { type: string }
+        order_type:
+          type: string
+          enum: [PO, RETURN, TRANSFER]
+        supplier_name: { type: string, nullable: true }
+        status:
+          type: string
+          enum: [DRAFT, ARRIVED, RECEIVING, RECEIVED, PUTAWAY, DONE, CANCELLED]
+        expected_at: { type: string, format: date, nullable: true }
+        received_at: { type: string, format: date-time, nullable: true }
+        total_expected_qty: { type: number }
+        total_received_qty: { type: number }
+        remark: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    InboundOrderDetail:
+      allOf:
+        - $ref: "#/components/schemas/InboundOrder"
+        - type: object
+          properties:
+            lines:
+              type: array
+              items: { $ref: "#/components/schemas/OrderLine" }
+
+    OrderLine:
+      type: object
+      properties:
+        id: { type: integer }
+        line_no: { type: integer }
+        sku_id: { type: integer }
+        sku_code: { type: string }
+        sku_name: { type: string }
+        qty_required: { type: number, description: 应收/应拣 }
+        qty_actual: { type: number, description: 实收/实拣 }
+        qty_rejected: { type: number, description: 不良/短拣 }
+        batch_no: { type: string }
+        expiry_date: { type: string, format: date }
+        from_location_id: { type: integer, nullable: true }
+        to_location_id: { type: integer, nullable: true }
+        status:
+          type: string
+          enum: [OPEN, ALLOCATED, PARTIAL, DONE, CANCELLED]
+
+    InboundOrderCreate:
+      type: object
+      required: [order_type, lines]
+      properties:
+        order_type:
+          type: string
+          enum: [PO, RETURN, TRANSFER]
+        supplier_name: { type: string, nullable: true }
+        expected_at: { type: string, format: date, nullable: true }
+        remark: { type: string, nullable: true }
+        lines:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [sku_id, qty_required]
+            properties:
+              sku_id: { type: integer }
+              qty_required: { type: number }
+
+    ReceiveRequest:
+      type: object
+      required: [lines]
+      properties:
+        lines:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [line_id, qty_actual]
+            properties:
+              line_id: { type: integer }
+              qty_actual: { type: number, description: 实收数量 }
+              qty_rejected: { type: number, default: 0, description: 不良数量 }
+              batch_no: { type: string, description: 批次（is_batch_managed 商品必填） }
+              expiry_date: { type: string, format: date, description: 效期 }
+
+    PutawayRequest:
+      type: object
+      properties:
+        lines:
+          type: array
+          items:
+            type: object
+            required: [line_id]
+            properties:
+              line_id: { type: integer }
+              to_location_id: { type: integer, description: 目标库位（可指定，缺省由系统按策略分配） }
+
+    # ---------- 出库 ----------
+    OutboundOrder:
+      type: object
+      properties:
+        id: { type: integer }
+        order_no: { type: string }
+        order_type:
+          type: string
+          enum: [SALE, RETURN, TRANSFER]
+        customer_name: { type: string, nullable: true }
+        status:
+          type: string
+          enum: [DRAFT, ALLOCATED, PICKING, PICKED, SHIPPED, CANCELLED]
+        priority: { type: integer, description: 越小越优先 }
+        carrier: { type: string, nullable: true }
+        tracking_no: { type: string, nullable: true }
+        requested_ship_at: { type: string, format: date, nullable: true }
+        shipped_at: { type: string, format: date-time, nullable: true }
+        total_qty: { type: number }
+        remark: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    OutboundOrderDetail:
+      allOf:
+        - $ref: "#/components/schemas/OutboundOrder"
+        - type: object
+          properties:
+            lines:
+              type: array
+              items: { $ref: "#/components/schemas/OrderLine" }
+
+    OutboundOrderCreate:
+      type: object
+      required: [order_type, lines]
+      properties:
+        order_type:
+          type: string
+          enum: [SALE, RETURN, TRANSFER]
+        customer_name: { type: string, nullable: true }
+        priority: { type: integer, default: 100 }
+        requested_ship_at: { type: string, format: date, nullable: true }
+        remark: { type: string, nullable: true }
+        lines:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [sku_id, qty_required]
+            properties:
+              sku_id: { type: integer }
+              qty_required: { type: number }
+
+    PickLine:
+      type: object
+      properties:
+        line_id: { type: integer }
+        sku_id: { type: integer }
+        sku_code: { type: string }
+        sku_name: { type: string }
+        location_id: { type: integer }
+        location_code: { type: string }
+        qty_required: { type: number }
+        batch_no: { type: string }
+        expiry_date: { type: string, format: date }
+
+    PickPlanResponse:
+      type: object
+      properties:
+        lines:
+          type: array
+          description: 拣货路径，按 pick_seq 排序
+          items: { $ref: "#/components/schemas/PickLine" }
+
+    PickConfirmRequest:
+      type: object
+      required: [lines]
+      properties:
+        lines:
+          type: array
+          items:
+            type: object
+            required: [line_id, qty_actual]
+            properties:
+              line_id: { type: integer }
+              qty_actual: { type: number, description: 实拣数量 }
+              qty_rejected: { type: number, default: 0, description: 短拣数量 }
+
+    ShipRequest:
+      type: object
+      properties:
+        carrier: { type: string, nullable: true }
+        tracking_no: { type: string, nullable: true }
+
+    # ---------- AI Agent ----------
+    AgentQueryRequest:
+      type: object
+      required: [query]
+      properties:
+        query: { type: string, description: 自然语言库存查询，如「3号库A区还有多少矿泉水」 }
+
+    AgentQueryResponse:
+      type: object
+      properties:
+        answer: { type: string, description: 结构化答案 }
+        sql_summary: { type: string, description: 数据来源 SQL 摘要（审计用） }
+        data:
+          type: array
+          items: { $ref: "#/components/schemas/InventoryItem" }
+
+    AgentSuggestion:
+      type: object
+      properties:
+        id: { type: integer }
+        type: { type: string, enum: [REPLENISH, TRANSFER] }
+        status: { type: string, enum: [PENDING, APPROVED, REJECTED] }
+        sku_id: { type: integer }
+        sku_code: { type: string }
+        suggested_qty: { type: number }
+        reason: { type: string }
+        created_at: { type: string, format: date-time }
+
+# ---------------------------------------------------------------------------
+# 路径
+# ---------------------------------------------------------------------------
+paths:
+  # ============ 认证 ============
+  /auth/login:
+    post:
+      tags: [auth]
+      summary: 登录换取 JWT
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LoginRequest" }
+      responses:
+        "200":
+          description: 登录成功
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LoginResponse" }
+        "401":
+          description: 用户名或密码错误
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /users/me:
+    get:
+      tags: [auth]
+      summary: 当前用户信息
+      operationId: get_me
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/User" }
+
+  # ============ 商品 ============
+  /skus:
+    get:
+      tags: [sku]
+      summary: 商品分页列表
+      operationId: list_skus
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: keyword
+          in: query
+          schema: { type: string }
+          description: 名称/编码/条码 模糊搜
+        - name: category
+          in: query
+          schema: { type: string }
+        - $ref: "#/components/parameters/page"
+        - $ref: "#/components/parameters/page_size"
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SkuListResponse" }
+    post:
+      tags: [sku]
+      summary: 新建商品
+      operationId: create_sku
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SkuCreate" }
+      responses:
+        "201":
+          description: 创建成功
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Sku" }
+        "409":
+          description: SKU 编码已存在
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /skus/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+    get:
+      tags: [sku]
+      summary: 商品详情
+      operationId: get_sku
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Sku" }
+        "404":
+          description: 商品不存在
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+    put:
+      tags: [sku]
+      summary: 修改商品
+      operationId: update_sku
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SkuUpdate" }
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Sku" }
+        "404":
+          description: 商品不存在
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  # ============ 库位 ============
+  /locations:
+    get:
+      tags: [location]
+      summary: 库位列表
+      operationId: list_locations
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: zone_code
+          in: query
+          schema: { type: string }
+        - name: location_type
+          in: query
+          schema:
+            type: string
+            enum: [STORAGE, RECEIVING, PICKING, STAGING, QUARANTINE]
+        - name: status
+          in: query
+          schema: { type: integer, enum: [0, 1] }
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LocationListResponse" }
+
+  # ============ 库存与流水 ============
+  /inventory:
+    get:
+      tags: [inventory]
+      summary: 库存余额查询
+      operationId: list_inventory
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: sku_code
+          in: query
+          schema: { type: string }
+        - name: location_code
+          in: query
+          schema: { type: string }
+        - name: location_type
+          in: query
+          schema:
+            type: string
+            enum: [STORAGE, RECEIVING, PICKING, STAGING, QUARANTINE]
+          description: 库位类型筛选（默认排除 RECEIVING 暂存位）
+        - name: batch_no
+          in: query
+          schema: { type: string }
+        - name: expiring_days
+          in: query
+          schema: { type: integer }
+          description: N 天内到期预警
+        - name: only_available
+          in: query
+          schema: { type: boolean, default: false }
+          description: 只看有货（可用库存 > 0）
+        - $ref: "#/components/parameters/page"
+        - $ref: "#/components/parameters/page_size"
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InventoryListResponse" }
+
+  /stock-txn:
+    get:
+      tags: [inventory]
+      summary: 库存流水查询
+      operationId: list_stock_txn
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: sku_code
+          in: query
+          schema: { type: string }
+        - name: txn_type
+          in: query
+          schema:
+            type: string
+            enum: [RECEIPT, PUTAWAY, PICK, SHIP, ADJUST, TRANSFER_IN, TRANSFER_OUT, COUNT_ADJUST, ALLOCATE, DEALLOCATE]
+        - name: source
+          in: query
+          schema:
+            type: string
+            enum: [WEB, PDA, AGENT, SYSTEM, IMPORT]
+          description: 来源过滤（含 AI 来源）
+        - name: from
+          in: query
+          schema: { type: string, format: date-time }
+          description: 开始时间
+        - name: to
+          in: query
+          schema: { type: string, format: date-time }
+          description: 结束时间
+        - $ref: "#/components/parameters/page"
+        - $ref: "#/components/parameters/page_size"
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StockTxnListResponse" }
+
+  /inventory/recon:
+    get:
+      tags: [inventory]
+      summary: 对账视图查询（MANAGER 及以上）
+      operationId: get_recon
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: recon_status
+          in: query
+          schema:
+            type: string
+            enum: [OK, MISMATCH, ONLY_INVENTORY, ONLY_TXN]
+          description: 只查异常时传非 OK
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/ReconItem" }
+        "403":
+          description: 权限不足（需 MANAGER 及以上）
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  # ============ 入库作业 ============
+  /inbound-orders:
+    get:
+      tags: [inbound]
+      summary: 入库单列表
+      operationId: list_inbound_orders
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [DRAFT, ARRIVED, RECEIVING, RECEIVED, PUTAWAY, DONE, CANCELLED]
+        - name: order_type
+          in: query
+          schema: { type: string, enum: [PO, RETURN, TRANSFER] }
+        - $ref: "#/components/parameters/page"
+        - $ref: "#/components/parameters/page_size"
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/InboundOrder" }
+                  meta: { $ref: "#/components/schemas/PageMeta" }
+    post:
+      tags: [inbound]
+      summary: 建入库单（头+明细一次提交，DRAFT）
+      operationId: create_inbound_order
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/InboundOrderCreate" }
+      responses:
+        "201":
+          description: 创建成功
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InboundOrderDetail" }
+
+  /inbound-orders/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+    get:
+      tags: [inbound]
+      summary: 入库单详情（头+明细+进度）
+      operationId: get_inbound_order
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InboundOrderDetail" }
+        "404":
+          description: 单据不存在
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /inbound-orders/{id}/lines/{lineId}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+      - name: lineId
+        in: path
+        required: true
+        schema: { type: integer }
+    patch:
+      tags: [inbound]
+      summary: 改明细数量（仅 DRAFT）
+      operationId: update_inbound_line
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [qty_required]
+              properties:
+                qty_required: { type: number }
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OrderLine" }
+        "409":
+          description: 状态不是 DRAFT，不能改
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /inbound-orders/{id}/receive:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+    post:
+      tags: [inbound]
+      summary: 收货（写暂存位，走 apply_txn RECEIPT）
+      operationId: receive_inbound_order
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/idempotency_key"
+        - $ref: "#/components/parameters/agent_run_id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ReceiveRequest" }
+      responses:
+        "200":
+          description: 收货成功
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InboundOrderDetail" }
+        "409":
+          description: 状态不允许收货 或 实收超过应收
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /inbound-orders/{id}/putaway:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+    post:
+      tags: [inbound]
+      summary: 上架（走 apply_txn PUTAWAY）
+      operationId: putaway_inbound_order
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/idempotency_key"
+        - $ref: "#/components/parameters/agent_run_id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PutawayRequest" }
+      responses:
+        "200":
+          description: 上架成功
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InboundOrderDetail" }
+        "409":
+          description: 状态不允许上架
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /inbound-orders/{id}/cancel:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+    post:
+      tags: [inbound]
+      summary: 取消入库单（仅 DRAFT/ARRIVED）
+      operationId: cancel_inbound_order
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: 取消成功
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InboundOrder" }
+        "409":
+          description: 状态不允许取消
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  # ============ 出库作业 ============
+  /outbound-orders:
+    get:
+      tags: [outbound]
+      summary: 出库单列表
+      operationId: list_outbound_orders
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [DRAFT, ALLOCATED, PICKING, PICKED, SHIPPED, CANCELLED]
+        - name: priority
+          in: query
+          schema: { type: integer }
+        - $ref: "#/components/parameters/page"
+        - $ref: "#/components/parameters/page_size"
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/OutboundOrder" }
+                  meta: { $ref: "#/components/schemas/PageMeta" }
+    post:
+      tags: [outbound]
+      summary: 建出库单（头+明细，DRAFT）
+      operationId: create_outbound_order
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/OutboundOrderCreate" }
+      responses:
+        "201":
+          description: 创建成功
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OutboundOrderDetail" }
+
+  /outbound-orders/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+    get:
+      tags: [outbound]
+      summary: 出库单详情（头+明细+进度）
+      operationId: get_outbound_order
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OutboundOrderDetail" }
+        "404":
+          description: 单据不存在
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /outbound-orders/{id}/allocate:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+    post:
+      tags: [outbound]
+      summary: 分配库存（按明细行 FEFO 锁批次，只动 allocated_delta）
+      operationId: allocate_outbound_order
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/idempotency_key"
+        - $ref: "#/components/parameters/agent_run_id"
+      responses:
+        "200":
+          description: 分配成功
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OutboundOrderDetail" }
+        "409":
+          description: 库存不足（detail 带 sku_code/batch_no/required/available/shortfall）
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /outbound-orders/{id}/pick:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+    get:
+      tags: [outbound]
+      summary: 获取拣货路径（按 pick_seq 排序）
+      operationId: get_pick_plan
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PickPlanResponse" }
+    post:
+      tags: [outbound]
+      summary: 拣货确认（走 apply_txn PICK）
+      operationId: pick_outbound_order
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/idempotency_key"
+        - $ref: "#/components/parameters/agent_run_id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PickConfirmRequest" }
+      responses:
+        "200":
+          description: 拣货成功
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OutboundOrderDetail" }
+
+  /outbound-orders/{id}/ship:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+    post:
+      tags: [outbound]
+      summary: 发运（扣减在途，走 apply_txn SHIP）
+      operationId: ship_outbound_order
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/idempotency_key"
+        - $ref: "#/components/parameters/agent_run_id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ShipRequest" }
+      responses:
+        "200":
+          description: 发运成功
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OutboundOrderDetail" }
+        "409":
+          description: 状态不允许发运
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /outbound-orders/{id}/cancel:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+    post:
+      tags: [outbound]
+      summary: 取消出库单（DRAFT/ALLOCATED，ALLOCATED 走 DEALLOCATE 回滚）
+      operationId: cancel_outbound_order
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/idempotency_key"
+      responses:
+        "200":
+          description: 取消成功
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OutboundOrder" }
+        "409":
+          description: 状态不允许取消
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  # ============ AI Agent（P2 占位） ============
+  /agent/queries:
+    post:
+      tags: [agent]
+      summary: 自然语言查库存（只读，P2 实现）
+      operationId: agent_query
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AgentQueryRequest" }
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AgentQueryResponse" }
+        "501":
+          description: Sprint 1 未实现
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /agent/suggestions:
+    post:
+      tags: [agent]
+      summary: AI 补货/调拨建议（写，生成待审批单，P2 实现）
+      operationId: agent_create_suggestion
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/agent_run_id"
+      responses:
+        "201":
+          description: 建议已落库（PENDING）
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AgentSuggestion" }
+        "501":
+          description: Sprint 1 未实现
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /agent/suggestions/{id}/approve:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer }
+    post:
+      tags: [agent]
+      summary: 人工审批建议（转正式单据，P2 实现）
+      operationId: agent_approve_suggestion
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: 审批通过，已转正式单据
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AgentSuggestion" }
+        "501":
+          description: Sprint 1 未实现
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
