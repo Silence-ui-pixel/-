@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>仓储智能管理 Agent 系统 · 领域模型（8 张表 + ER 图）</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f4f6fa;
+    --ink: #0f172a;
+    --ink2: #56657c;
+    --ink3: #8a97a8;
+    --line: #e3e9f0;
+    --blue: #3b6ef5;
+    --purple: #6d4aff;
+    --teal: #0d9aa8;
+    --amber: #e08a00;
+    --red: #d6455d;
+    --green: #12a06a;
+    --slate: #5c6b80;
+  }
+
+  body {
+    font-family: "Segoe UI", "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+    background: var(--bg); color: var(--ink);
+    -webkit-font-smoothing: antialiased; line-height: 1.6;
+    padding: 32px 24px 48px;
+  }
+
+  .doc {
+    width: 1080px; margin: 0 auto;
+    background:
+      radial-gradient(900px 400px at 6% -6%, #e9eefc 0%, rgba(233,238,252,0) 60%),
+      radial-gradient(800px 360px at 96% 0%, #f1eaff 0%, rgba(241,234,255,0) 58%),
+      #f8fafd;
+    border: 1px solid var(--line); border-radius: 20px;
+    padding: 34px 40px 36px;
+    box-shadow: 0 1px 2px rgba(15,23,42,.04), 0 24px 60px -34px rgba(15,23,42,.24);
+  }
+
+  /* header */
+  .hdr { padding-bottom: 20px; border-bottom: 1px solid var(--line); margin-bottom: 26px; }
+  .hdr h1 { font-size: 24px; font-weight: 700; letter-spacing: .3px; display: flex; align-items: center; gap: 11px; }
+  .hdr h1::before { content: ""; width: 5px; height: 25px; border-radius: 3px; background: linear-gradient(180deg, var(--purple), var(--teal)); }
+  .hdr .sub { font-size: 12.5px; color: var(--ink2); margin: 8px 0 0 16px; }
+  .badges { display: flex; gap: 8px; margin: 13px 0 0 16px; flex-wrap: wrap; }
+  .badges span { font-size: 11px; padding: 4px 10px; border-radius: 999px; background: #fff; border: 1px solid var(--line); color: var(--ink2); }
+  .badges span b { color: var(--blue); }
+
+  /* section */
+  section { margin-bottom: 30px; }
+  .sh { display: flex; align-items: center; gap: 10px; margin-bottom: 13px; }
+  .sh .no { flex: 0 0 auto; width: 22px; height: 22px; border-radius: 6px; background: var(--blue); color: #fff;
+    font-size: 11.5px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+  .sh.p .no { background: var(--purple); }
+  .sh.t .no { background: var(--teal); }
+  .sh.a .no { background: var(--amber); }
+  .sh h2 { font-size: 16.5px; font-weight: 700; letter-spacing: .2px; }
+  .sh .hint { font-size: 11.5px; color: var(--ink3); }
+
+  p { font-size: 13.2px; color: #2c3a52; }
+  p + p { margin-top: 9px; }
+  .muted { color: var(--ink2); }
+
+  code { font-family: Consolas, "Courier New", monospace; font-size: 11.6px;
+    background: #eef3fb; padding: 1px 5px; border-radius: 4px; color: #1d4ed8; }
+  .note code { background: #f6efdc; color: #8a5a05; }
+
+  /* law cards */
+  .laws { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .law { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 14px 15px;
+    border-top: 3px solid var(--purple);
+    box-shadow: 0 1px 2px rgba(15,23,42,.03), 0 8px 20px -18px rgba(15,23,42,.5); }
+  .law:nth-child(2) { border-top-color: var(--red); }
+  .law:nth-child(3) { border-top-color: var(--teal); }
+  .law .lt { font-size: 13.2px; font-weight: 700; margin-bottom: 6px; }
+  .law .ld { font-size: 12.1px; color: var(--ink2); line-height: 1.6; }
+  .law .ld b { color: var(--ink); }
+
+  /* diagram */
+  .diagram { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 8px 10px 4px;
+    box-shadow: 0 1px 2px rgba(15,23,42,.03), 0 12px 30px -24px rgba(15,23,42,.5); overflow-x: auto; }
+  svg { display: block; width: 100%; height: auto; }
+
+  /* table card */
+  .tc { background: #fff; border: 1px solid var(--line); border-radius: 13px; padding: 0 0 14px; margin-bottom: 14px;
+    box-shadow: 0 1px 2px rgba(15,23,42,.03), 0 10px 24px -22px rgba(15,23,42,.45); overflow: hidden; }
+  .tc-hd { display: flex; align-items: center; gap: 10px; padding: 11px 16px; background: #f7f9fc; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  .tc-hd .n { flex: 0 0 auto; width: 20px; height: 20px; border-radius: 5px; background: var(--blue); color: #fff;
+    font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+  .tc-hd .tn { font-family: Consolas, "Courier New", monospace; font-size: 13.6px; font-weight: 700; letter-spacing: .2px; }
+  .tc-hd .cn { font-size: 12.2px; color: var(--ink2); }
+  .tc-hd .ln { margin-left: auto; font-size: 10.5px; color: #fff; padding: 2px 8px; border-radius: 4px; background: var(--teal); }
+  .tc-hd .ln.m { background: var(--blue); }
+  .tc-hd .ln.c { background: var(--purple); }
+  .tc-hd .ln.u { background: var(--slate); }
+  .tc-desc { font-size: 12.4px; color: var(--ink2); padding: 12px 16px 10px; }
+
+  table.ft { width: 100%; border-collapse: collapse; font-size: 12.2px; margin: 0; }
+  table.ft th { text-align: left; font-size: 10.8px; font-weight: 700; color: var(--ink3); letter-spacing: .4px;
+    padding: 7px 10px; background: #fbfcfe; border-top: 1px solid #eef2f7; border-bottom: 1px solid #eef2f7; }
+  table.ft td { padding: 6px 10px; border-bottom: 1px solid #f4f7fa; vertical-align: middle; }
+  table.ft tr:last-child td { border-bottom: 0; }
+  table.ft td.nm { font-family: Consolas, "Courier New", monospace; font-size: 11.5px; color: #1f2d43; white-space: nowrap; }
+  table.ft td.tp { font-family: Consolas, "Courier New", monospace; font-size: 10.9px; color: #8494a8; white-space: nowrap; }
+  table.ft td.dc { color: #3d4c63; }
+  table.ft td.dc code { font-family: Consolas, monospace; font-size: 10.8px; background: #f1f5f9; padding: 1px 4px; border-radius: 3px; color: #0f766e; }
+
+  .b { display: inline-block; font-size: 8.8px; font-weight: 700; padding: 1px 4px; border-radius: 3px; margin-right: 5px; vertical-align: 1px; letter-spacing: .3px; }
+  .b.pk { background: #fef3c7; color: #92400e; }
+  .b.fk { background: #e0e7ff; color: #3730a3; }
+  .b.gen { background: #ecfdf5; color: #047857; }
+
+  .note { margin: 11px 16px 0; font-size: 12.1px; color: #6b5326; background: #fffaf0;
+    border-left: 3px solid var(--amber); border-radius: 0 7px 7px 0; padding: 9px 13px; line-height: 1.6; }
+  .note b { color: #8a5a05; }
+  .note.t { background: #f2fbfc; border-left-color: var(--teal); color: #1f5c63; }
+  .note.t b { color: #0a6470; }
+
+  /* code */
+  pre { background: #0f1729; color: #d7e2f4; border-radius: 10px; padding: 15px 17px; overflow-x: auto;
+    font-family: Consolas, "Courier New", monospace; font-size: 11.6px; line-height: 1.72; margin: 0; }
+  pre .c { color: #6b8099; }
+  pre .k { color: #8fb8ff; }
+  pre .s { color: #7fd6a2; }
+  pre .n { color: #ffc46b; }
+  .codewrap { border-radius: 11px; overflow: hidden; border: 1px solid #1c2740; }
+  .codecap { background: #182238; color: #93a7c4; font-size: 11px; padding: 8px 16px;
+    font-family: Consolas, monospace; border-bottom: 1px solid #24314c; display: flex; justify-content: space-between; }
+  .codecap b { color: #cfdcf0; font-weight: 600; }
+
+  /* decision rows */
+  .dec { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 12px 15px; margin-bottom: 9px;
+    display: flex; gap: 12px; }
+  .dec .dn { flex: 0 0 auto; font-size: 10.5px; font-weight: 700; color: var(--purple);
+    background: #f3efff; border-radius: 5px; padding: 2px 7px; height: 19px; margin-top: 2px; }
+  .dec .db { font-size: 12.5px; }
+  .dec .db b { display: block; margin-bottom: 3px; }
+  .dec .db span { color: var(--ink2); }
+
+  /* footer */
+  .foot { margin-top: 28px; padding-top: 15px; border-top: 1px solid var(--line);
+    font-size: 11.5px; color: var(--ink3); display: flex; justify-content: space-between; gap: 20px; }
+
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+</style>
+</head>
+<body>
+<div class="doc">
+
+  <div class="hdr">
+    <h1>领域模型 · 8 张表与 ER 图</h1>
+    <div class="sub">单仓最小闭环的可执行数据模型，配套建库脚本 <code style="font-family:Consolas;font-size:12px;background:#eef3fb;padding:2px 6px;border-radius:4px">db/schema.sql</code></div>
+    <div class="badges">
+      <span><b>8</b> 张表</span>
+      <span>PostgreSQL <b>16+</b></span>
+      <span>已通过语法解析校验（<b>67</b> 条语句）</span>
+      <span>含种子数据与对账视图</span>
+    </div>
+  </div>
+
+  <!-- 1 三条铁律 -->
+  <section>
+    <div class="sh p"><div class="no">1</div><h2>三条铁律</h2><span class="hint">后面所有代码都必须服从，违反一条账就不准</span></div>
+    <div class="laws">
+      <div class="law">
+        <div class="lt">库存只有一个写入口</div>
+        <div class="ld">全系统只有 <b>stock_service</b> 能改 <code>inventory</code>。任何模块想动库存，必须调它。<b>禁止绕过入口直接 UPDATE</b>——这是账实不一致的第一大来源。</div>
+      </div>
+      <div class="law">
+        <div class="lt">改余额必写流水</div>
+        <div class="ld">改 <code>inventory</code> 和写 <code>stock_txn</code> 必须在<b>同一个事务</b>里，且流水带上 <code>before_on_hand</code> / <code>after_on_hand</code> 快照，可逐笔复算。</div>
+      </div>
+      <div class="law">
+        <div class="lt">流水只追加，永不修改</div>
+        <div class="ld"><code>stock_txn</code> 上挂了触发器，<b>数据库层面直接拒绝 UPDATE / DELETE</b>。审计链断了就再也拼不回来。</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2 ER 图 -->
+  <section>
+    <div class="sh"><div class="no">2</div><h2>ER 图</h2><span class="hint">颜色区分四组：主数据 / 库存核心 / 单据 / 用户</span></div>
+
+    <div class="diagram">
+      <svg viewBox="0 0 960 900" style="font-family:'Segoe UI','Microsoft YaHei',sans-serif" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <filter id="sh" x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#0f172a" flood-opacity="0.08"/>
+          </filter>
+        </defs>
+        <rect x="0" y="0" width="960" height="900" fill="#ffffff"/>
+
+        <!-- ============ edges (先画，压在框下面) ============ -->
+        <g fill="none" stroke="#b8c4d4" stroke-width="1.4">
+          <path d="M280 140 H352"/>
+          <path d="M280 220 H312 V430 H352"/>
+          <path d="M280 470 H352"/>
+          <path d="M481 540 V600"/>
+          <path d="M680 150 H610"/>
+          <path d="M680 380 H640 V250 H610"/>
+          <path d="M680 660 H650 V730 H610"/>
+        </g>
+        <path d="M800 580 V497" fill="none" stroke="#c3b6e8" stroke-width="1.3" stroke-dasharray="4 3"/>
+
+        <!-- cardinality labels -->
+        <g font-size="9" fill="#8fa0b5" font-weight="600">
+          <text x="290" y="134" text-anchor="middle">1</text><text x="344" y="134" text-anchor="middle">N</text>
+          <text x="296" y="213" text-anchor="middle">1</text><text x="347" y="424" text-anchor="middle">N</text>
+          <text x="296" y="463" text-anchor="middle">1</text><text x="347" y="463" text-anchor="middle">N</text>
+          <text x="487" y="554" text-anchor="middle">1</text><text x="487" y="596" text-anchor="middle">N</text>
+          <text x="670" y="144" text-anchor="middle">1</text><text x="618" y="144" text-anchor="middle">N</text>
+          <text x="670" y="374" text-anchor="middle">1</text><text x="618" y="244" text-anchor="middle">N</text>
+          <text x="670" y="654" text-anchor="middle">1</text><text x="618" y="724" text-anchor="middle">N</text>
+        </g>
+
+        <!-- ============ sku ============ -->
+        <g filter="url(#sh)">
+          <rect x="40" y="72" width="240" height="200" rx="8" fill="#ffffff" stroke="#dce3ec"/>
+          <path d="M40 80 a8 8 0 0 1 8-8 h224 a8 8 0 0 1 8 8 v24 h-240 z" fill="#3b6ef5"/>
+          <text x="52" y="95" font-size="12.5" font-weight="700" fill="#ffffff">sku</text>
+          <text x="268" y="95" font-size="10" fill="#ccd9ff" text-anchor="end">商品主数据</text>
+          <g font-size="11" fill="#26364d">
+            <rect x="50" y="109.5" width="22" height="13" rx="3" fill="#fef3c7"/><text x="61" y="119.5" font-size="8.5" font-weight="700" fill="#92400e" text-anchor="middle">PK</text>
+            <text x="82" y="119.5">id</text><text x="270" y="119.5" font-size="9.5" fill="#a8b3c2" text-anchor="end">bigserial</text>
+            <text x="52" y="140.5">sku_code</text><text x="270" y="140.5" font-size="9.5" fill="#a8b3c2" text-anchor="end">varchar(64)</text>
+            <text x="52" y="161.5">barcode</text><text x="270" y="161.5" font-size="9.5" fill="#a8b3c2" text-anchor="end">varchar(64)</text>
+            <text x="52" y="182.5">name</text><text x="270" y="182.5" font-size="9.5" fill="#a8b3c2" text-anchor="end">varchar(200)</text>
+            <text x="52" y="203.5">base_uom</text><text x="270" y="203.5" font-size="9.5" fill="#a8b3c2" text-anchor="end">varchar(16)</text>
+            <text x="52" y="224.5">is_batch_managed</text><text x="270" y="224.5" font-size="9.5" fill="#a8b3c2" text-anchor="end">boolean</text>
+            <text x="52" y="245.5">safety_stock</text><text x="270" y="245.5" font-size="9.5" fill="#a8b3c2" text-anchor="end">numeric</text>
+            <text x="52" y="266.5">reorder_point</text><text x="270" y="266.5" font-size="9.5" fill="#a8b3c2" text-anchor="end">numeric</text>
+          </g>
+        </g>
+
+        <!-- ============ location ============ -->
+        <g filter="url(#sh)">
+          <rect x="40" y="318" width="240" height="200" rx="8" fill="#ffffff" stroke="#dce3ec"/>
+          <path d="M40 326 a8 8 0 0 1 8-8 h224 a8 8 0 0 1 8 8 v24 h-240 z" fill="#3b6ef5"/>
+          <text x="52" y="341" font-size="12.5" font-weight="700" fill="#ffffff">location</text>
+          <text x="268" y="341" font-size="10" fill="#ccd9ff" text-anchor="end">库位</text>
+          <g font-size="11" fill="#26364d">
+            <rect x="50" y="355.5" width="22" height="13" rx="3" fill="#fef3c7"/><text x="61" y="365.5" font-size="8.5" font-weight="700" fill="#92400e" text-anchor="middle">PK</text>
+            <text x="82" y="365.5">id</text><text x="270" y="365.5" font-size="9.5" fill="#a8b3c2" text-anchor="end">bigserial</text>
+            <text x="52" y="386.5">location_code</text><text x="270" y="386.5" font-size="9.5" fill="#a8b3c2" text-anchor="end">varchar(96)</text>
+            <text x="52" y="407.5">zone_code</text><text x="270" y="407.5" font-size="9.5" fill="#a8b3c2" text-anchor="end">varchar(32)</text>
+            <text x="52" y="428.5">location_type</text><text x="270" y="428.5" font-size="9.5" fill="#a8b3c2" text-anchor="end">varchar(16)</text>
+            <text x="52" y="449.5">pick_seq</text><text x="270" y="449.5" font-size="9.5" fill="#a8b3c2" text-anchor="end">integer</text>
+            <text x="52" y="470.5">capacity_qty</text><text x="270" y="470.5" font-size="9.5" fill="#a8b3c2" text-anchor="end">numeric</text>
+            <text x="52" y="491.5">is_mixed_sku</text><text x="270" y="491.5" font-size="9.5" fill="#a8b3c2" text-anchor="end">boolean</text>
+            <text x="52" y="512.5">status</text><text x="270" y="512.5" font-size="9.5" fill="#a8b3c2" text-anchor="end">smallint</text>
+          </g>
+        </g>
+
+        <!-- ============ order_line ============ -->
+        <g filter="url(#sh)">
+          <rect x="352" y="72" width="258" height="221" rx="8" fill="#ffffff" stroke="#dce3ec"/>
+          <path d="M352 80 a8 8 0 0 1 8-8 h242 a8 8 0 0 1 8 8 v24 h-258 z" fill="#0d9aa8"/>
+          <text x="364" y="95" font-size="12.5" font-weight="700" fill="#ffffff">order_line</text>
+          <text x="598" y="95" font-size="10" fill="#bde9ee" text-anchor="end">单据明细</text>
+          <g font-size="11" fill="#26364d">
+            <rect x="362" y="109.5" width="22" height="13" rx="3" fill="#fef3c7"/><text x="373" y="119.5" font-size="8.5" font-weight="700" fill="#92400e" text-anchor="middle">PK</text>
+            <text x="394" y="119.5">id</text><text x="600" y="119.5" font-size="9.5" fill="#a8b3c2" text-anchor="end">bigserial</text>
+            <text x="364" y="140.5">order_type</text><text x="600" y="140.5" font-size="9.5" fill="#a8b3c2" text-anchor="end">char(2)</text>
+            <rect x="362" y="151.5" width="22" height="13" rx="3" fill="#e0e7ff"/><text x="373" y="161.5" font-size="8.5" font-weight="700" fill="#3730a3" text-anchor="middle">FK</text>
+            <text x="394" y="161.5">inbound_id</text><text x="600" y="161.5" font-size="9.5" fill="#a8b3c2" text-anchor="end">bigint</text>
+            <rect x="362" y="172.5" width="22" height="13" rx="3" fill="#e0e7ff"/><text x="373" y="182.5" font-size="8.5" font-weight="700" fill="#3730a3" text-anchor="middle">FK</text>
+            <text x="394" y="182.5">outbound_id</text><text x="600" y="182.5" font-size="9.5" fill="#a8b3c2" text-anchor="end">bigint</text>
+            <rect x="362" y="193.5" width="22" height="13" rx="3" fill="#e0e7ff"/><text x="373" y="203.5" font-size="8.5" font-weight="700" fill="#3730a3" text-anchor="middle">FK</text>
+            <text x="394" y="203.5">sku_id</text><text x="600" y="203.5" font-size="9.5" fill="#a8b3c2" text-anchor="end">bigint</text>
+            <text x="364" y="224.5">qty_required</text><text x="600" y="224.5" font-size="9.5" fill="#a8b3c2" text-anchor="end">numeric</text>
+            <text x="364" y="245.5">qty_actual</text><text x="600" y="245.5" font-size="9.5" fill="#a8b3c2" text-anchor="end">numeric</text>
+            <rect x="362" y="256.5" width="22" height="13" rx="3" fill="#e0e7ff"/><text x="373" y="266.5" font-size="8.5" font-weight="700" fill="#3730a3" text-anchor="middle">FK</text>
+            <text x="394" y="266.5">from_location_id</text><text x="600" y="266.5" font-size="9.5" fill="#a8b3c2" text-anchor="end">bigint</text>
+            <rect x="362" y="277.5" width="22" height="13" rx="3" fill="#e0e7ff"/><text x="373" y="287.5" font-size="8.5" font-weight="700" fill="#3730a3" text-anchor="middle">FK</text>
+            <text x="394" y="287.5">to_location_id</text><text x="600" y="287.5" font-size="9.5" fill="#a8b3c2" text-anchor="end">bigint</text>
+          </g>
+        </g>
+
+        <!-- ============ inventory ============ -->
+        <g filter="url(#sh)">
+          <rect x="352" y="340" width="258" height="200" rx="8" fill="#ffffff" stroke="#d3c7ff" stroke-width="1.4"/>
+          <path d="M352 348 a8 8 0 0 1 8-8 h242 a8 8 0 0 1 8 8 v24 h-258 z" fill="#6d4aff"/>
+          <text x="364" y="363" font-size="12.5" font-weight="700" fill="#ffffff">inventory</text>
+          <text x="598" y="363" font-size="10" fill="#ddd3ff" text-anchor="end">库存余额 · 唯一写入点</text>
+          <g font-size="11" fill="#26364d">
+            <rect x="362" y="377.5" width="22" height="13" rx="3" fill="#fef3c7"/><text x="373" y="387.5" font-size="8.5" font-weight="700" fill="#92400e" text-anchor="middle">PK</text>
+            <text x="394" y="387.5">id</text><text x="600" y="387.5" font-size="9.5" fill="#a8b3c2" text-anchor="end">bigserial</text>
+            <rect x="362" y="398.5" width="22" height="13" rx="3" fill="#e0e7ff"/><text x="373" y="408.5" font-size="8.5" font-weight="700" fill="#3730a3" text-anchor="middle">FK</text>
+            <text x="394" y="408.5">sku_id</text><text x="600" y="408.5" font-size="9.5" fill="#a8b3c2" text-anchor="end">bigint</text>
+            <rect x="362" y="419.5" width="22" height="13" rx="3" fill="#e0e7ff"/><text x="373" y="429.5" font-size="8.5" font-weight="700" fill="#3730a3" text-anchor="middle">FK</text>
+            <text x="394" y="429.5">location_id</text><text x="600" y="429.5" font-size="9.5" fill="#a8b3c2" text-anchor="end">bigint</text>
+            <text x="364" y="450.5">batch_no</text><text x="600" y="450.5" font-size="9.5" fill="#a8b3c2" text-anchor="end">varchar(64)</text>
+            <text x="364" y="471.5">expiry_date</text><text x="600" y="471.5" font-size="9.5" fill="#a8b3c2" text-anchor="end">date</text>
+            <text x="364" y="492.5">qty_on_hand</text><text x="600" y="492.5" font-size="9.5" fill="#a8b3c2" text-anchor="end">numeric</text>
+            <text x="364" y="513.5">qty_allocated</text><text x="600" y="513.5" font-size="9.5" fill="#a8b3c2" text-anchor="end">numeric</text>
+            <rect x="362" y="524.5" width="30" height="13" rx="3" fill="#ecfdf5"/><text x="377" y="534.5" font-size="8" font-weight="700" fill="#047857" text-anchor="middle">GEN</text>
+            <text x="402" y="534.5">qty_available</text><text x="600" y="534.5" font-size="9.5" fill="#a8b3c2" text-anchor="end">numeric</text>
+          </g>
+        </g>
+
+        <!-- ============ stock_txn ============ -->
+        <g filter="url(#sh)">
+          <rect x="352" y="600" width="258" height="221" rx="8" fill="#ffffff" stroke="#d3c7ff" stroke-width="1.4"/>
+          <path d="M352 608 a8 8 0 0 1 8-8 h242 a8 8 0 0 1 8 8 v24 h-258 z" fill="#6d4aff"/>
+          <text x="364" y="623" font-size="12.5" font-weight="700" fill="#ffffff">stock_txn</text>
+          <text x="598" y="623" font-size="10" fill="#ddd3ff" text-anchor="end">库存流水 · 只追加</text>
+          <g font-size="11" fill="#26364d">
+            <rect x="362" y="637.5" width="22" height="13" rx="3" fill="#fef3c7"/><text x="373" y="647.5" font-size="8.5" font-weight="700" fill="#92400e" text-anchor="middle">PK</text>
+            <text x="394" y="647.5">id</text><text x="600" y="647.5" font-size="9.5" fill="#a8b3c2" text-anchor="end">bigserial</text>
+            <text x="364" y="668.5">txn_type</text><text x="600" y="668.5" font-size="9.5" fill="#a8b3c2" text-anchor="end">varchar(24)</text>
+            <rect x="362" y="679.5" width="22" height="13" rx="3" fill="#e0e7ff"/><text x="373" y="689.5" font-size="8.5" font-weight="700" fill="#3730a3" text-anchor="middle">FK</text>
+            <text x="394" y="689.5">sku_id</text><text x="600" y="689.5" font-size="9.5" fill="#a8b3c2" text-anchor="end">bigint</text>
+            <rect x="362" y="700.5" width="22" height="13" rx="3" fill="#e0e7ff"/><text x="373" y="710.5" font-size="8.5" font-weight="700" fill="#3730a3" text-anchor="middle">FK</text>
+            <text x="394" y="710.5">location_id</text><text x="600" y="710.5" font-size="9.5" fill="#a8b3c2" text-anchor="end">bigint</text>
+            <text x="364" y="731.5">on_hand_delta</text><text x="600" y="731.5" font-size="9.5" fill="#a8b3c2" text-anchor="end">numeric</text>
+            <text x="364" y="752.5">allocated_delta</text><text x="600" y="752.5" font-size="9.5" fill="#a8b3c2" text-anchor="end">numeric</text>
+            <text x="364" y="773.5">before_on_hand</text><text x="600" y="773.5" font-size="9.5" fill="#a8b3c2" text-anchor="end">numeric</text>
+            <text x="364" y="794.5">source</text><text x="600" y="794.5" font-size="9.5" fill="#a8b3c2" text-anchor="end">varchar(16)</text>
+            <text x="364" y="815.5">agent_run_id</text><text x="600" y="815.5" font-size="9.5" fill="#a8b3c2" text-anchor="end">varchar(64)</text>
+          </g>
+        </g>
+
+        <!-- ============ inbound_order ============ -->
+        <g filter="url(#sh)">
+          <rect x="680" y="72" width="240" height="179" rx="8" fill="#ffffff" stroke="#dce3ec"/>
+          <path d="M680 80 a8 8 0 0 1 8-8 h224 a8 8 0 0 1 8 8 v24 h-240 z" fill="#0d9aa8"/>
+          <text x="692" y="95" font-size="12.5" font-weight="700" fill="#ffffff">inbound_order</text>
+          <text x="908" y="95" font-size="10" fill="#bde9ee" text-anchor="end">入库单</text>
+          <g font-size="11" fill="#26364d">
+            <rect x="690" y="109.5" width="22" height="13" rx="3" fill="#fef3c7"/><text x="701" y="119.5" font-size="8.5" font-weight="700" fill="#92400e" text-anchor="middle">PK</text>
+            <text x="722" y="119.5">id</text><text x="910" y="119.5" font-size="9.5" fill="#a8b3c2" text-anchor="end">bigserial</text>
+            <text x="692" y="140.5">order_no</text><text x="910" y="140.5" font-size="9.5" fill="#a8b3c2" text-anchor="end">varchar(40)</text>
+            <text x="692" y="161.5">supplier_name</text><text x="910" y="161.5" font-size="9.5" fill="#a8b3c2" text-anchor="end">varchar(200)</text>
+            <text x="692" y="182.5">status</text><text x="910" y="182.5" font-size="9.5" fill="#a8b3c2" text-anchor="end">varchar(20)</text>
+            <text x="692" y="203.5">expected_at</text><text x="910" y="203.5" font-size="9.5" fill="#a8b3c2" text-anchor="end">date</text>
+            <text x="692" y="224.5">total_expected_qty</text><text x="910" y="224.5" font-size="9.5" fill="#a8b3c2" text-anchor="end">numeric</text>
+            <text x="692" y="245.5">received_at</text><text x="910" y="245.5" font-size="9.5" fill="#a8b3c2" text-anchor="end">timestamptz</text>
+          </g>
+        </g>
+
+        <!-- ============ outbound_order ============ -->
+        <g filter="url(#sh)">
+          <rect x="680" y="318" width="240" height="179" rx="8" fill="#ffffff" stroke="#dce3ec"/>
+          <path d="M680 326 a8 8 0 0 1 8-8 h224 a8 8 0 0 1 8 8 v24 h-240 z" fill="#0d9aa8"/>
+          <text x="692" y="341" font-size="12.5" font-weight="700" fill="#ffffff">outbound_order</text>
+          <text x="908" y="341" font-size="10" fill="#bde9ee" text-anchor="end">出库单</text>
+          <g font-size="11" fill="#26364d">
+            <rect x="690" y="355.5" width="22" height="13" rx="3" fill="#fef3c7"/><text x="701" y="365.5" font-size="8.5" font-weight="700" fill="#92400e" text-anchor="middle">PK</text>
+            <text x="722" y="365.5">id</text><text x="910" y="365.5" font-size="9.5" fill="#a8b3c2" text-anchor="end">bigserial</text>
+            <text x="692" y="386.5">order_no</text><text x="910" y="386.5" font-size="9.5" fill="#a8b3c2" text-anchor="end">varchar(40)</text>
+            <text x="692" y="407.5">customer_name</text><text x="910" y="407.5" font-size="9.5" fill="#a8b3c2" text-anchor="end">varchar(200)</text>
+            <text x="692" y="428.5">status</text><text x="910" y="428.5" font-size="9.5" fill="#a8b3c2" text-anchor="end">varchar(20)</text>
+            <text x="692" y="449.5">priority</text><text x="910" y="449.5" font-size="9.5" fill="#a8b3c2" text-anchor="end">smallint</text>
+            <text x="692" y="470.5">requested_ship_at</text><text x="910" y="470.5" font-size="9.5" fill="#a8b3c2" text-anchor="end">date</text>
+            <text x="692" y="491.5">total_qty</text><text x="910" y="491.5" font-size="9.5" fill="#a8b3c2" text-anchor="end">numeric</text>
+          </g>
+        </g>
+
+        <!-- ============ app_user ============ -->
+        <g filter="url(#sh)">
+          <rect x="680" y="580" width="240" height="137" rx="8" fill="#ffffff" stroke="#dce3ec"/>
+          <path d="M680 588 a8 8 0 0 1 8-8 h224 a8 8 0 0 1 8 8 v24 h-240 z" fill="#5c6b80"/>
+          <text x="692" y="603" font-size="12.5" font-weight="700" fill="#ffffff">app_user</text>
+          <text x="908" y="603" font-size="10" fill="#d5dde7" text-anchor="end">用户</text>
+          <g font-size="11" fill="#26364d">
+            <rect x="690" y="617.5" width="22" height="13" rx="3" fill="#fef3c7"/><text x="701" y="627.5" font-size="8.5" font-weight="700" fill="#92400e" text-anchor="middle">PK</text>
+            <text x="722" y="627.5">id</text><text x="910" y="627.5" font-size="9.5" fill="#a8b3c2" text-anchor="end">bigserial</text>
+            <text x="692" y="648.5">username</text><text x="910" y="648.5" font-size="9.5" fill="#a8b3c2" text-anchor="end">varchar(64)</text>
+            <text x="692" y="669.5">display_name</text><text x="910" y="669.5" font-size="9.5" fill="#a8b3c2" text-anchor="end">varchar(64)</text>
+            <text x="692" y="690.5">role</text><text x="910" y="690.5" font-size="9.5" fill="#a8b3c2" text-anchor="end">varchar(16)</text>
+            <text x="692" y="711.5">status</text><text x="910" y="711.5" font-size="9.5" fill="#a8b3c2" text-anchor="end">smallint</text>
+          </g>
+        </g>
+
+        <!-- ============ legend ============ -->
+        <g font-size="10" fill="#7d8ea3">
+          <line x1="40" y1="852" x2="70" y2="852" stroke="#b8c4d4" stroke-width="1.4"/>
+          <text x="78" y="855">外键关系 1 : N</text>
+          <line x1="196" y1="852" x2="226" y2="852" stroke="#c3b6e8" stroke-width="1.3" stroke-dasharray="4 3"/>
+          <text x="234" y="855">弱引用（审计字段，不建外键）</text>
+          <rect x="440" y="846" width="22" height="13" rx="3" fill="#fef3c7"/>
+          <text x="451" y="855.5" font-size="8.5" font-weight="700" fill="#92400e" text-anchor="middle">PK</text>
+          <text x="468" y="855">主键</text>
+          <rect x="516" y="846" width="22" height="13" rx="3" fill="#e0e7ff"/>
+          <text x="527" y="855.5" font-size="8.5" font-weight="700" fill="#3730a3" text-anchor="middle">FK</text>
+          <text x="544" y="855">外键</text>
+          <rect x="592" y="846" width="30" height="13" rx="3" fill="#ecfdf5"/>
+          <text x="607" y="855.5" font-size="8" font-weight="700" fill="#047857" text-anchor="middle">GEN</text>
+          <text x="628" y="855">生成列（不可写）</text>
+        </g>
+      </svg>
+    </div>
+
+    <p class="muted" style="margin-top:11px;font-size:12.2px">
+      图中只画了主链路关系。<code style="font-family:Consolas;font-size:11.5px">stock_txn</code> 同样引用 <code style="font-family:Consolas;font-size:11.5px">sku</code> / <code style="font-family:Consolas;font-size:11.5px">location</code> / <code style="font-family:Consolas;font-size:11.5px">app_user</code>（operator_id），因线条过多省略，DDL 里外键是完整的。
+    </p>
+  </section>
+
+  <!-- 3 八张表 -->
+  <section>
+    <div class="sh t"><div class="no">3</div><h2>八张表逐张说明</h2><span class="hint">字段与 db/schema.sql 完全一致</span></div>
+
+    <!-- app_user -->
+    <div class="tc">
+      <div class="tc-hd"><div class="n">1</div><span class="tn">app_user</span><span class="cn">用户</span><span class="ln u">基础表 · 先建</span></div>
+      <div class="tc-desc">MVP 阶段用固定角色枚举，不建 role / permission 表。仓管系统的权限粒度没那么细，四个人角色足够撑到试点结束。</div>
+      <table class="ft">
+        <tr><th style="width:180px">字段</th><th style="width:150px">类型</th><th>说明</th></tr>
+        <tr><td class="nm"><span class="b pk">PK</span>id</td><td class="tp">bigserial</td><td class="dc">主键</td></tr>
+        <tr><td class="nm">username</td><td class="tp">varchar(64)</td><td class="dc">登录名，唯一</td></tr>
+        <tr><td class="nm">display_name</td><td class="tp">varchar(64)</td><td class="dc">显示名，扫码头/单据签字用</td></tr>
+        <tr><td class="nm">password_hash</td><td class="tp">varchar(200)</td><td class="dc">bcrypt 哈希，<b>禁止明文与 MD5</b></td></tr>
+        <tr><td class="nm">role</td><td class="tp">varchar(16)</td><td class="dc"><code>ADMIN</code> / <code>MANAGER</code> / <code>OPERATOR</code> / <code>VIEWER</code></td></tr>
+        <tr><td class="nm">status</td><td class="tp">smallint</td><td class="dc">1 启用 / 0 停用</td></tr>
+        <tr><td class="nm">last_login_at</td><td class="tp">timestamptz</td><td class="dc">最后登录</td></tr>
+        <tr><td class="nm">created_at / updated_at</td><td class="tp">timestamptz</td><td class="dc">创建 / 更新时间（触发器自动维护）</td></tr>
+      </table>
+    </div>
+
+    <!-- sku -->
+    <div class="tc">
+      <div class="tc-hd"><div class="n">2</div><span class="tn">sku</span><span class="cn">商品主数据</span><span class="ln m">主数据</span></div>
+      <div class="tc-desc">商品是仓储系统里变更最少的表，但它的字段设计会决定后面所有作业逻辑。<code>is_batch_managed</code> 和 <code>shelf_life_days</code> 是两个开关，直接控制入库是否强制填批次、出库是否走 FEFO。</div>
+      <table class="ft">
+        <tr><th style="width:180px">字段</th><th style="width:150px">类型</th><th>说明</th></tr>
+        <tr><td class="nm"><span class="b pk">PK</span>id</td><td class="tp">bigserial</td><td class="dc">主键</td></tr>
+        <tr><td class="nm">sku_code</td><td class="tp">varchar(64)</td><td class="dc">SKU 编码，唯一，业务主键</td></tr>
+        <tr><td class="nm">barcode</td><td class="tp">varchar(64)</td><td class="dc">条码，可空。扫码枪按此字段查，建了部分索引</td></tr>
+        <tr><td class="nm">name / spec</td><td class="tp">varchar(200)</td><td class="dc">名称 / 规格</td></tr>
+        <tr><td class="nm">category</td><td class="tp">varchar(64)</td><td class="dc">分类，先放字符串，不做分类表</td></tr>
+        <tr><td class="nm">base_uom</td><td class="tp">varchar(16)</td><td class="dc">基本单位 <code>EA</code>/<code>BOX</code>/<code>PACK</code>。<b>MVP 不做单位换算</b></td></tr>
+        <tr><td class="nm">weight_kg / volume_m3</td><td class="tp">numeric</td><td class="dc">单件重量 / 体积，用于装载与库位容量校验</td></tr>
+        <tr><td class="nm">shelf_life_days</td><td class="tp">integer</td><td class="dc">保质期天数。为 null 表示不管理效期，入库不校验</td></tr>
+        <tr><td class="nm">abc_class</td><td class="tp">char(1)</td><td class="dc">A/B/C 分类，库位分配策略用：A 类放靠近出货口的黄金位</td></tr>
+        <tr><td class="nm">is_batch_managed</td><td class="tp">boolean</td><td class="dc">是否批次管理。true 时入库明细必须带 <code>batch_no</code></td></tr>
+        <tr><td class="nm">safety_stock</td><td class="tp">numeric</td><td class="dc">安全库存，库存预警与补货 Agent 的输入</td></tr>
+        <tr><td class="nm">reorder_point</td><td class="tp">numeric</td><td class="dc">补货点，低于此值触发补货建议</td></tr>
+        <tr><td class="nm">status</td><td class="tp">smallint</td><td class="dc">1 启用 / 0 停用（停产商品保留历史，不删）</td></tr>
+        <tr><td class="nm">created_at / updated_at</td><td class="tp">timestamptz</td><td class="dc">时间戳</td></tr>
+      </table>
+      <div class="note"><b>刻意简化：</b>把 <code>safety_stock</code> / <code>reorder_point</code> 直接放在 SKU 上。真实系统应按时段、按仓、按供应商交期拆分到 <code>sku_stock_policy</code> 表。MVP 先放这，因为补货 Agent 需要一个可写的落点，等策略真的复杂了再拆——那时你有真实数据支撑，拆得对。</div>
+    </div>
+
+    <!-- location -->
+    <div class="tc">
+      <div class="tc-hd"><div class="n">3</div><span class="tn">location</span><span class="cn">库位</span><span class="ln m">主数据</span></div>
+      <div class="tc-desc">整个模型里最容易被过度设计的一张表。很多人上来就做 <code>warehouse → zone → rack → level → bin</code> 五张表的递归树，结果为了查一个库位要 join 四次。</div>
+      <table class="ft">
+        <tr><th style="width:180px">字段</th><th style="width:150px">类型</th><th>说明</th></tr>
+        <tr><td class="nm"><span class="b pk">PK</span>id</td><td class="tp">bigserial</td><td class="dc">主键</td></tr>
+        <tr><td class="nm">warehouse_code</td><td class="tp">varchar(32)</td><td class="dc">仓库编码，默认 <code>WH01</code>。单仓也要留，改多仓时不用改结构</td></tr>
+        <tr><td class="nm">zone_code</td><td class="tp">varchar(32)</td><td class="dc">库区，如 <code>A</code> / <code>COLD</code> / <code>HAZ</code></td></tr>
+        <tr><td class="nm">rack_code</td><td class="tp">varchar(32)</td><td class="dc">货架，如 <code>01</code></td></tr>
+        <tr><td class="nm">level_no</td><td class="tp">smallint</td><td class="dc">层号</td></tr>
+        <tr><td class="nm">bin_code</td><td class="tp">varchar(32)</td><td class="dc">位号</td></tr>
+        <tr><td class="nm">location_code</td><td class="tp">varchar(96)</td><td class="dc">全码 <code>WH01-A-01-03-02</code>，唯一。扫码枪扫的就是它</td></tr>
+        <tr><td class="nm">location_type</td><td class="tp">varchar(16)</td><td class="dc"><code>STORAGE</code> / <code>RECEIVING</code> / <code>PICKING</code> / <code>STAGING</code> / <code>QUARANTINE</code></td></tr>
+        <tr><td class="nm">pick_seq</td><td class="tp">integer</td><td class="dc">拣货顺序号。按蛇形动线编排，拣货单按它排序就是最短路径</td></tr>
+        <tr><td class="nm">capacity_qty / capacity_volume</td><td class="tp">numeric</td><td class="dc">容量上限，上架推荐时做约束</td></tr>
+        <tr><td class="nm">is_mixed_sku / is_mixed_batch</td><td class="tp">boolean</td><td class="dc">是否允许混放 SKU / 批次。上架校验用</td></tr>
+        <tr><td class="nm">status</td><td class="tp">smallint</td><td class="dc">1 可用 / 0 停用（维修、封存）</td></tr>
+        <tr><td class="nm">created_at / updated_at</td><td class="tp">timestamptz</td><td class="dc">时间戳</td></tr>
+      </table>
+      <div class="note"><b>为什么不做 parent_id 递归：</b>仓储层级是固定的四层，永远不会变。扁平冗余列 + 全码字符串，让「查某库区所有库位」「按拣货顺序排序」都变成单表查询，不用递归 CTE。这是用一点存储冗余换掉一整类性能问题和复杂度。</div>
+    </div>
+
+    <!-- inventory -->
+    <div class="tc">
+      <div class="tc-hd"><div class="n">4</div><span class="tn">inventory</span><span class="cn">库存余额</span><span class="ln c">核心 · 唯一写入点</span></div>
+      <div class="tc-desc">全系统只有一个服务能写这张表。唯一维度是 <b>SKU + 库位 + 批次 + 效期</b>，四个字段共同决定一行库存。</div>
+      <table class="ft">
+        <tr><th style="width:180px">字段</th><th style="width:150px">类型</th><th>说明</th></tr>
+        <tr><td class="nm"><span class="b pk">PK</span>id</td><td class="tp">bigserial</td><td class="dc">主键</td></tr>
+        <tr><td class="nm"><span class="b fk">FK</span>sku_id</td><td class="tp">bigint</td><td class="dc">商品</td></tr>
+        <tr><td class="nm"><span class="b fk">FK</span>location_id</td><td class="tp">bigint</td><td class="dc">库位</td></tr>
+        <tr><td class="nm">batch_no</td><td class="tp">varchar(64)</td><td class="dc">批次号，<b>默认空串而不是 NULL</b>（见下方说明）</td></tr>
+        <tr><td class="nm">expiry_date</td><td class="tp">date</td><td class="dc">效期，<b>默认哨兵值 9999-12-31</b></td></tr>
+        <tr><td class="nm">qty_on_hand</td><td class="tp">numeric(14,3)</td><td class="dc">现有量（物理在库），约束 ≥ 0</td></tr>
+        <tr><td class="nm">qty_allocated</td><td class="tp">numeric(14,3)</td><td class="dc">已分配量（被出库单锁定），约束 0 ≤ 它 ≤ 现有量</td></tr>
+        <tr><td class="nm"><span class="b gen">GEN</span>qty_available</td><td class="tp">numeric(14,3)</td><td class="dc">可用量 = 现有量 − 已分配量，<b>生成列，代码不可写</b></td></tr>
+        <tr><td class="nm">version</td><td class="tp">bigint</td><td class="dc">乐观锁版本号，并发扣减时用</td></tr>
+        <tr><td class="nm">updated_at</td><td class="tp">timestamptz</td><td class="dc">更新时间</td></tr>
+      </table>
+      <div class="note t"><b>为什么 batch_no 用空串、expiry_date 用 9999-12-31：</b>PostgreSQL 里 <code>NULL = NULL</code> 结果是 NULL 而不是 true，所以唯一约束 <code>unique(sku_id, location_id, batch_no, expiry_date)</code> 在含 NULL 的行上<b>形同虚设</b>——同一个维度会被重复插入多行，库存直接算错。用空串和哨兵日期把 NULL 挤出去，唯一约束才真正生效。这是库存系统最常见的一个隐藏 bug。</div>
+    </div>
+
+    <!-- stock_txn -->
+    <div class="tc">
+      <div class="tc-hd"><div class="n">5</div><span class="tn">stock_txn</span><span class="cn">库存流水</span><span class="ln c">核心 · 只追加</span></div>
+      <div class="tc-desc">系统的账本。每一次库存变化都必须留下一条，带变动前后的快照。<b>能逐笔复算出当前余额</b>，这是账实一致的技术底线。</div>
+      <table class="ft">
+        <tr><th style="width:180px">字段</th><th style="width:150px">类型</th><th>说明</th></tr>
+        <tr><td class="nm"><span class="b pk">PK</span>id</td><td class="tp">bigserial</td><td class="dc">主键</td></tr>
+        <tr><td class="nm">txn_no</td><td class="tp">varchar(40)</td><td class="dc">流水号，唯一，便于对账和人工排查</td></tr>
+        <tr><td class="nm">txn_type</td><td class="tp">varchar(24)</td><td class="dc"><code>RECEIPT</code> 收货 / <code>PUTAWAY</code> 上架 / <code>PICK</code> 拣货 / <code>SHIP</code> 发货 / <code>ADJUST</code> 调整 / <code>TRANSFER_IN</code> / <code>TRANSFER_OUT</code> / <code>COUNT_ADJUST</code> 盘点 / <code>ALLOCATE</code> 分配 / <code>DEALLOCATE</code> 释放</td></tr>
+        <tr><td class="nm"><span class="b fk">FK</span>sku_id / location_id</td><td class="tp">bigint</td><td class="dc">变动的库存维度</td></tr>
+        <tr><td class="nm">batch_no / expiry_date</td><td class="tp">varchar / date</td><td class="dc">同上，用空串与哨兵值</td></tr>
+        <tr><td class="nm">on_hand_delta</td><td class="tp">numeric</td><td class="dc"><b>现有量变化</b>。入库为正、出库为负、分配为 0</td></tr>
+        <tr><td class="nm">allocated_delta</td><td class="tp">numeric</td><td class="dc"><b>分配量变化</b>。分配为正、拣货出库为负</td></tr>
+        <tr><td class="nm">before_on_hand / after_on_hand</td><td class="tp">numeric</td><td class="dc">变动前后快照，约束 <code>after = before + on_hand_delta</code> 强制自洽</td></tr>
+        <tr><td class="nm">ref_type / ref_id / ref_line_id</td><td class="tp">varchar / bigint</td><td class="dc">来源单据类型、单头 ID、明细行 ID，可回溯到具体哪一行</td></tr>
+        <tr><td class="nm">source</td><td class="tp">varchar(16)</td><td class="dc"><code>WEB</code> / <code>PDA</code> / <b><code>AGENT</code></b> / <code>SYSTEM</code> / <code>IMPORT</code></td></tr>
+        <tr><td class="nm"><span class="b" style="background:#f3efff;color:#4c2fd0">AI</span>agent_run_id</td><td class="tp">varchar(64)</td><td class="dc">AI 发起时记下会话 / 审批单 ID。<b>能回答「这单是哪个 Agent 哪次审批产生的」</b></td></tr>
+        <tr><td class="nm"><span class="b fk">FK</span>operator_id</td><td class="tp">bigint</td><td class="dc">操作人，系统作业可为空</td></tr>
+        <tr><td class="nm">remark</td><td class="tp">varchar(500)</td><td class="dc">备注，人工调整必须填写原因</td></tr>
+        <tr><td class="nm">created_at</td><td class="tp">timestamptz</td><td class="dc">发生时间，不做 updated_at —— 这行永远不会被改</td></tr>
+      </table>
+      <div class="note"><b>为什么用两个 delta 而不是「数量 + 方向」：</b>因为「分配库存」这个动作<b>只动 allocated 不动 on_hand</b>。如果只有单列 <code>qty</code>，这种变动表达不出来，会导致按流水汇总时对不上余额。<code>source</code> + <code>agent_run_id</code> 是给 AI 治理留的钩子——没有这两个字段，出了事根本查不到是哪个 Agent 干的。</div>
+    </div>
+
+    <!-- inbound_order -->
+    <div class="tc">
+      <div class="tc-hd"><div class="n">6</div><span class="tn">inbound_order</span><span class="cn">入库单头</span><span class="ln">单据</span></div>
+      <div class="tc-desc">只管单头和状态，数量明细在 <code>order_line</code>。头表冗余两个汇总字段，是为了列表页不用每次聚合。</div>
+      <table class="ft">
+        <tr><th style="width:180px">字段</th><th style="width:150px">类型</th><th>说明</th></tr>
+        <tr><td class="nm"><span class="b pk">PK</span>id</td><td class="tp">bigserial</td><td class="dc">主键</td></tr>
+        <tr><td class="nm">order_no</td><td class="tp">varchar(40)</td><td class="dc">单号 <code>IB202610240001</code>，唯一</td></tr>
+        <tr><td class="nm">order_type</td><td class="tp">varchar(16)</td><td class="dc"><code>PO</code> 采购 / <code>RETURN</code> 退货 / <code>TRANSFER</code> 调拨</td></tr>
+        <tr><td class="nm">supplier_name</td><td class="tp">varchar(200)</td><td class="dc">供应商名称，不做供应商表（MVP）</td></tr>
+        <tr><td class="nm">status</td><td class="tp">varchar(20)</td><td class="dc"><code>DRAFT</code> → <code>ARRIVED</code> → <code>RECEIVING</code> → <code>RECEIVED</code> → <code>PUTAWAY</code> → <code>DONE</code>，或 <code>CANCELLED</code></td></tr>
+        <tr><td class="nm">expected_at</td><td class="tp">date</td><td class="dc">预计到货日，用于排收货计划</td></tr>
+        <tr><td class="nm">received_at</td><td class="tp">timestamptz</td><td class="dc">收货完成时间</td></tr>
+        <tr><td class="nm">total_expected_qty / total_received_qty</td><td class="tp">numeric</td><td class="dc">汇总冗余，由明细更新时同步维护</td></tr>
+        <tr><td class="nm">created_by</td><td class="tp">bigint</td><td class="dc">建单人</td></tr>
+        <tr><td class="nm">version</td><td class="tp">bigint</td><td class="dc">乐观锁，防并发改同一单据</td></tr>
+        <tr><td class="nm">created_at / updated_at</td><td class="tp">timestamptz</td><td class="dc">时间戳</td></tr>
+      </table>
+    </div>
+
+    <!-- outbound_order -->
+    <div class="tc">
+      <div class="tc-hd"><div class="n">7</div><span class="tn">outbound_order</span><span class="cn">出库单头</span><span class="ln">单据</span></div>
+      <div class="tc-desc">状态机比入库多一个「已分配」，因为出库要先锁库存再拣货。这个中间态是防超卖的关键。</div>
+      <table class="ft">
+        <tr><th style="width:180px">字段</th><th style="width:150px">类型</th><th>说明</th></tr>
+        <tr><td class="nm"><span class="b pk">PK</span>id</td><td class="tp">bigserial</td><td class="dc">主键</td></tr>
+        <tr><td class="nm">order_no</td><td class="tp">varchar(40)</td><td class="dc">单号 <code>OB202610240001</code>，唯一</td></tr>
+        <tr><td class="nm">order_type</td><td class="tp">varchar(16)</td><td class="dc"><code>SALE</code> 销售 / <code>RETURN</code> 退供 / <code>TRANSFER</code> 调拨</td></tr>
+        <tr><td class="nm">customer_name</td><td class="tp">varchar(200)</td><td class="dc">客户名称</td></tr>
+        <tr><td class="nm">status</td><td class="tp">varchar(20)</td><td class="dc"><code>DRAFT</code> → <b><code>ALLOCATED</code></b> → <code>PICKING</code> → <code>PICKED</code> → <code>SHIPPED</code>，或 <code>CANCELLED</code></td></tr>
+        <tr><td class="nm">priority</td><td class="tp">smallint</td><td class="dc">优先级，越小越优先，默认 100。<b>AI 可调</b>，是 Agent 影响作业顺序的合法入口</td></tr>
+        <tr><td class="nm">carrier / tracking_no</td><td class="tp">varchar(64)</td><td class="dc">承运商 / 运单号</td></tr>
+        <tr><td class="nm">requested_ship_at</td><td class="tp">date</td><td class="dc">要求发货日，超期预警用</td></tr>
+        <tr><td class="nm">shipped_at</td><td class="tp">timestamptz</td><td class="dc">实际发运时间</td></tr>
+        <tr><td class="nm">total_qty</td><td class="tp">numeric</td><td class="dc">汇总冗余</td></tr>
+        <tr><td class="nm">created_by</td><td class="tp">bigint</td><td class="dc">建单人</td></tr>
+        <tr><td class="nm">version</td><td class="tp">bigint</td><td class="dc">乐观锁</td></tr>
+        <tr><td class="nm">created_at / updated_at</td><td class="tp">timestamptz</td><td class="dc">时间戳</td></tr>
+      </table>
+    </div>
+
+    <!-- order_line -->
+    <div class="tc">
+      <div class="tc-hd"><div class="n">8</div><span class="tn">order_line</span><span class="cn">单据明细</span><span class="ln">单据 · 多态</span></div>
+      <div class="tc-desc">入库明细和出库明细的字段重合度约 80%，拆成两张表意味着两套几乎一样的代码。这里合并成一张，用判别列区分归属。</div>
+      <table class="ft">
+        <tr><th style="width:180px">字段</th><th style="width:150px">类型</th><th>说明</th></tr>
+        <tr><td class="nm"><span class="b pk">PK</span>id</td><td class="tp">bigserial</td><td class="dc">主键</td></tr>
+        <tr><td class="nm">order_type</td><td class="tp">char(2)</td><td class="dc"><code>IN</code> 入库 / <code>OUT</code> 出库，判别列</td></tr>
+        <tr><td class="nm"><span class="b fk">FK</span>inbound_id</td><td class="tp">bigint</td><td class="dc">入库单（<code>order_type='IN'</code> 时非空）</td></tr>
+        <tr><td class="nm"><span class="b fk">FK</span>outbound_id</td><td class="tp">bigint</td><td class="dc">出库单（<code>order_type='OUT'</code> 时非空）</td></tr>
+        <tr><td class="nm">line_no</td><td class="tp">integer</td><td class="dc">行号，单内唯一</td></tr>
+        <tr><td class="nm"><span class="b fk">FK</span>sku_id</td><td class="tp">bigint</td><td class="dc">商品</td></tr>
+        <tr><td class="nm">qty_required</td><td class="tp">numeric(14,3)</td><td class="dc">应收 / 应拣数量</td></tr>
+        <tr><td class="nm">qty_actual</td><td class="tp">numeric(14,3)</td><td class="dc">实收 / 实拣数量，出库约束不得超过应收</td></tr>
+        <tr><td class="nm">qty_rejected</td><td class="tp">numeric(14,3)</td><td class="dc">不良 / 短拣数量</td></tr>
+        <tr><td class="nm">batch_no / expiry_date</td><td class="tp">varchar / date</td><td class="dc">批次与效期，空串与哨兵值同 inventory</td></tr>
+        <tr><td class="nm"><span class="b fk">FK</span>from_location_id</td><td class="tp">bigint</td><td class="dc">出库：分配的拣货库位</td></tr>
+        <tr><td class="nm"><span class="b fk">FK</span>to_location_id</td><td class="tp">bigint</td><td class="dc">入库：上架目标库位</td></tr>
+        <tr><td class="nm">status</td><td class="tp">varchar(16)</td><td class="dc"><code>OPEN</code> / <code>ALLOCATED</code> / <code>PARTIAL</code> / <code>DONE</code> / <code>CANCELLED</code></td></tr>
+        <tr><td class="nm">remark</td><td class="tp">varchar(500)</td><td class="dc">备注</td></tr>
+        <tr><td class="nm">created_at / updated_at</td><td class="tp">timestamptz</td><td class="dc">时间戳</td></tr>
+      </table>
+      <div class="note t"><b>多态归属怎么保住外键完整性：</b>两个可空外键 + CHECK 约束保证「恰好一个非空」，所以外键约束依然生效，只是从「非空」变成「条件非空」。唯一性不能用普通 UNIQUE（可空列在 UNIQUE 里同样有 NULL 问题），改用两个部分唯一索引：<code>where inbound_id is not null</code> / <code>where outbound_id is not null</code>。这是 PostgreSQL 里做多态表的标准手法。</div>
+    </div>
+  </section>
+
+  <!-- 4 一致性机制 -->
+  <section>
+    <div class="sh p"><div class="no">4</div><h2>库存一致性怎么保证</h2><span class="hint">这是整个模型唯一真正难的地方</span></div>
+
+    <p style="margin-bottom:13px">三条铁律只是原则，落地靠下面这段事务模板。所有改变库存的代码路径（收货、上架、拣货、发货、盘点、AI 建议执行）都必须走同一个函数，函数内部就是这五步。</p>
+
+    <div class="codewrap">
+      <div class="codecap"><b>stock_service.apply_txn() · 唯一写入口</b><span>PostgreSQL</span></div>
+      <pre><span class="k">BEGIN</span>;
+
+<span class="c">-- 1) 锁定库存维度（行级锁，串行化同一 SKU+库位+批次的并发）</span>
+<span class="k">SELECT</span> id, qty_on_hand, qty_allocated, version
+  <span class="k">FROM</span> inventory
+ <span class="k">WHERE</span> sku_id = <span class="n">:sku</span> <span class="k">AND</span> location_id = <span class="n">:loc</span>
+   <span class="k">AND</span> batch_no = <span class="n">:batch</span> <span class="k">AND</span> expiry_date = <span class="n">:exp</span>
+   <span class="k">FOR UPDATE</span>;
+
+<span class="c">-- 2) 校验可用量：qty_on_hand - qty_allocated &gt;= :qty</span>
+<span class="c">--    不足则抛业务异常并回滚，绝不允许负库存</span>
+
+<span class="c">-- 3) 改余额（CHECK 约束是最后一道防线）</span>
+<span class="k">UPDATE</span> inventory
+   <span class="k">SET</span> qty_on_hand = qty_on_hand - <span class="n">:qty</span>,
+       version     = version + <span class="n">1</span>
+ <span class="k">WHERE</span> id = <span class="n">:inv_id</span>
+   <span class="k">AND</span> version = <span class="n">:ver</span>;          <span class="c">-- 乐观锁，影响行数为 0 则重试</span>
+
+<span class="c">-- 4) 写流水，快照必须与第 3 步结果严格一致</span>
+<span class="k">INSERT INTO</span> stock_txn
+  (txn_no, txn_type, sku_id, location_id, batch_no, expiry_date,
+   on_hand_delta, allocated_delta, before_on_hand, after_on_hand,
+   ref_type, ref_id, ref_line_id, source, agent_run_id, operator_id)
+<span class="k">VALUES</span>
+  (<span class="s">'TXN...'</span>, <span class="s">'PICK'</span>, <span class="n">:sku</span>, <span class="n">:loc</span>, <span class="n">:batch</span>, <span class="n">:exp</span>,
+   -<span class="n">:qty</span>, -<span class="n">:qty</span>, <span class="n">:before</span>, <span class="n">:after</span>,
+   <span class="s">'OUTBOUND'</span>, <span class="n">:order_id</span>, <span class="n">:line_id</span>, <span class="s">'AGENT'</span>, <span class="n">:run_id</span>, <span class="n">:operator</span>);
+
+<span class="c">-- 5) 同步单据明细与单据头汇总</span>
+<span class="k">UPDATE</span> order_line   <span class="k">SET</span> qty_actual = qty_actual + <span class="n">:qty</span> <span class="k">WHERE</span> id = <span class="n">:line_id</span>;
+<span class="k">UPDATE</span> outbound_order <span class="k">SET</span> total_qty = total_qty - <span class="n">:qty</span> <span class="k">WHERE</span> id = <span class="n">:order_id</span>;
+
+<span class="k">COMMIT</span>;</pre>
+    </div>
+
+    <p style="margin-top:14px;margin-bottom:10px"><b>对账是兜底。</b>单元测试和代码审查都可能漏，所以每天定时跑一次视图，出现任何非 <code>OK</code> 立刻告警。这个视图已经在 <code>schema.sql</code> 里建好了。</p>
+
+    <div class="codewrap">
+      <div class="codecap"><b>每日对账</b><span>v_inventory_recon</span></div>
+      <pre><span class="k">select</span> recon_status, <span class="k">count</span>(*) <span class="k">as</span> cnt
+  <span class="k">from</span> v_inventory_recon
+ <span class="k">group by</span> recon_status;
+
+<span class="c">-- 期望结果只有一行：OK</span>
+<span class="c">-- MISMATCH        余额与流水累计不符 → 有代码绕过了入口，或事务断裂</span>
+<span class="c">-- ONLY_INVENTORY  有余额行但无任何流水 → 有人直接 INSERT 了余额</span>
+<span class="c">-- ONLY_TXN        有流水但无余额行 → 漏建 inventory 行</span></pre>
+    </div>
+  </section>
+
+  <!-- 5 刻意决定 -->
+  <section>
+    <div class="sh a"><div class="no">5</div><h2>六个刻意的设计决定</h2><span class="hint">每个都能被质疑，所以写清理由</span></div>
+
+    <div class="dec"><div class="dn">01</div><div class="db"><b>库位不做递归树，用扁平编码</b><span>层级固定四层，永不变。扁平化让「按库区查」和「按拣货顺序排」都是单表查询，省掉递归 CTE 和五张关联表。</span></div></div>
+    <div class="dec"><div class="dn">02</div><div class="db"><b>入库/出库明细合并为一张表</b><span>字段重合 80%，合并省掉一套 CRUD 代码。代价是多态归属稍复杂，用 CHECK + 部分唯一索引补回完整性。</span></div></div>
+    <div class="dec"><div class="dn">03</div><div class="db"><b>batch_no 空串、expiry_date 哨兵值</b><span>为了让唯一约束真正生效。这是 PostgreSQL 上做库存系统的必修课，不这么写会静默产生重复库存行。</span></div></div>
+    <div class="dec"><div class="dn">04</div><div class="db"><b>qty_available 用生成列而非普通列</b><span>可用量在列表页、分配、AI 查询里都是高频字段。生成列保证它永远等于现有量减分配量，不可能不一致，也不占维护成本。</span></div></div>
+    <div class="dec"><div class="dn">05</div><div class="db"><b>流水用双 delta 而非「数量+方向」</b><span>因为「分配」只动 allocated 不动 on_hand。单列表达不了，会导致流水汇总对不上余额。</span></div></div>
+    <div class="dec"><div class="dn">06</div><div class="db"><b>单据头冗余汇总字段</b><span>列表页要显示总量，聚合明细在数据量上来后会很慢。代价是每次改明细要同步更新头，但这一步本来就在同一个事务里。</span></div></div>
+  </section>
+
+  <!-- 6 下一步 -->
+  <section style="margin-bottom:6px">
+    <div class="sh t"><div class="no">6</div><h2>现在可以直接做的事</h2></div>
+    <div class="two">
+      <div style="background:#fff;border:1px solid var(--line);border-radius:11px;padding:14px 16px">
+        <div style="font-size:12.8px;font-weight:700;margin-bottom:8px;color:var(--teal)">执行建库</div>
+        <pre style="background:#f7f9fc;color:#26364d;border:1px solid var(--line);font-size:11.4px;padding:11px 13px">docker run -d --name pg-canku \
+  -e POSTGRES_PASSWORD=canku \
+  -e POSTGRES_DB=canku \
+  -p 5432:5432 postgres:16
+
+psql -h localhost -U postgres -d canku \
+  -f db/schema.sql</pre>
+        <p style="font-size:11.8px;color:var(--ink3);margin-top:9px">执行后自带 3 个 SKU、8 个库位、1 条期初库存，可直接开写接口。</p>
+      </div>
+      <div style="background:#fff;border:1px solid var(--line);border-radius:11px;padding:14px 16px">
+        <div style="font-size:12.8px;font-weight:700;margin-bottom:8px;color:var(--purple)">两人分工落点</div>
+        <p style="font-size:12.3px;color:var(--ink2);margin-bottom:9px"><b style="color:var(--ink)">成员 A</b>：<code style="font-family:Consolas;font-size:11.5px">stock_service</code> 与状态机就照这份模型写，先实现 apply_txn 一个函数。</p>
+        <p style="font-size:12.3px;color:var(--ink2);margin-bottom:9px"><b style="color:var(--ink)">成员 B</b>：从这份模型直接生成 OpenAPI 的 schema，前端和 Agent 的 mock 数据都从这来。</p>
+        <p style="font-size:12.3px;color:var(--ink2)">契约从数据库反推，比手写 YAML 快得多，也不会漏字段。</p>
+      </div>
+    </div>
+
+    <div class="note" style="margin:14px 0 0">
+      <b>待你确认的三个业务决策（会影响字段）：</b>① 是否需要多仓——需要则 <code>location.warehouse_code</code> 要参与唯一约束；② 商品是否需要单位换算（箱↔瓶）——需要则要加 <code>sku_uom_conversion</code> 表；③ 是否跨批次混拣——影响拣货分配算法，但不动表结构。
+    </div>
+  </section>
+
+  <div class="foot">
+    <span>领域模型 v0.1 · 8 张表 · 配套 <code style="font-family:Consolas;font-size:11px">db/schema.sql</code></span>
+    <span>SQL 已通过解析校验；建议在真实实例上再跑一次 migrate</span>
+  </div>
+
+</div>
+</body>
+</html>

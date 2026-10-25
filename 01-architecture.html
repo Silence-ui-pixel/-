@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>仓储智能管理 Agent 系统 · 总体架构图</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f4f6fa;
+    --panel: #ffffff;
+    --ink: #0f172a;
+    --ink2: #5b6b82;
+    --ink3: #8a97a8;
+    --line: #e3e9f0;
+    --line-strong: #cbd5e1;
+
+    --c-access: #3b6ef5;
+    --c-agent: #6d4aff;
+    --c-biz: #0d9aa8;
+    --c-algo: #e08a00;
+    --c-data: #12a06a;
+    --c-device: #5c6b80;
+    --c-gov: #d6455d;
+  }
+
+  body {
+    font-family: "Segoe UI", "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+    padding: 32px 28px 44px;
+  }
+
+  .canvas {
+    width: 1380px;
+    margin: 0 auto;
+    background:
+      radial-gradient(1200px 500px at 12% -10%, #e8eefc 0%, rgba(232,238,252,0) 62%),
+      radial-gradient(1000px 420px at 92% 0%, #efe9ff 0%, rgba(239,233,255,0) 60%),
+      #f7f9fc;
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    padding: 30px 32px 28px;
+    box-shadow: 0 1px 2px rgba(15,23,42,.04), 0 24px 60px -32px rgba(15,23,42,.22);
+  }
+
+  /* ---------- header ---------- */
+  .hdr { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; padding-bottom: 18px; border-bottom: 1px solid var(--line); margin-bottom: 22px; }
+  .hdr h1 { font-size: 23px; font-weight: 700; letter-spacing: .3px; display: flex; align-items: center; gap: 10px; }
+  .hdr h1::before { content: ""; width: 5px; height: 24px; border-radius: 3px; background: linear-gradient(180deg, var(--c-agent), var(--c-access)); }
+  .hdr .sub { font-size: 12.5px; color: var(--ink2); margin-top: 7px; margin-left: 15px; letter-spacing: .2px; }
+  .hdr .tag { flex: 0 0 auto; font-size: 11.5px; color: var(--ink2); border: 1px dashed var(--line-strong); padding: 6px 12px; border-radius: 999px; background: #fff; }
+  .hdr .tag b { color: var(--c-agent); }
+
+  /* ---------- layout ---------- */
+  .body { display: grid; grid-template-columns: 1fr 208px; gap: 16px; align-items: stretch; }
+  .main { display: flex; flex-direction: column; }
+
+  /* ---------- layer ---------- */
+  .layer {
+    display: flex;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 13px;
+    box-shadow: 0 1px 2px rgba(15,23,42,.03), 0 10px 26px -22px rgba(15,23,42,.45);
+    overflow: hidden;
+  }
+  .layer--agent {
+    border-color: #ddd5ff;
+    box-shadow: 0 1px 2px rgba(109,74,255,.06), 0 14px 34px -22px rgba(109,74,255,.55);
+  }
+
+  .rail {
+    flex: 0 0 62px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+    color: #fff;
+  }
+  .rail .num { font-size: 11px; font-weight: 700; opacity: .78; letter-spacing: 1px; }
+  .rail .name { writing-mode: vertical-rl; text-orientation: upright; font-size: 13px; font-weight: 700; letter-spacing: 5px; }
+
+  .rail { background: linear-gradient(165deg, #738297, var(--c-device)); }
+
+  .lbody { flex: 1; padding: 13px 16px 14px; display: flex; flex-direction: column; gap: 9px; min-width: 0; }
+  .lhead { display: flex; align-items: baseline; gap: 9px; flex-wrap: wrap; }
+  .lhead .t { font-size: 14.5px; font-weight: 700; }
+  .lhead .d { font-size: 11.5px; color: var(--ink3); }
+
+  .row { display: flex; flex-wrap: wrap; gap: 7px; }
+
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 11px; border-radius: 7px;
+    font-size: 12.2px; line-height: 1.35;
+    background: #f5f8fc; border: 1px solid #e6ecf3; color: #24334a;
+    white-space: nowrap;
+  }
+  .chip .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--line-strong); flex: 0 0 auto; }
+  .chip--key { background: #edf3ff; border-color: #d3e0ff; color: #1e4bd8; font-weight: 600; }
+  .chip--key .dot { background: var(--c-access); }
+  .chip--agent { background: #f3efff; border-color: #e0d7ff; color: #4c2fd0; font-weight: 600; }
+  .chip--agent .dot { background: var(--c-agent); }
+  .chip--biz { background: #ecf8f9; border-color: #d2ecef; color: #0a7381; }
+  .chip--biz .dot { background: var(--c-biz); }
+  .chip--algo { background: #fdf6e7; border-color: #f6e5c0; color: #96600a; }
+  .chip--algo .dot { background: var(--c-algo); }
+  .chip--data { background: #eafaf2; border-color: #cfeee0; color: #0a7a52; }
+  .chip--data .dot { background: var(--c-data); }
+  .chip--dev { background: #f2f5f9; border-color: #e2e8f0; color: #445168; }
+  .chip--dev .dot { background: var(--c-device); }
+  .chip--ghost { background: #fff; border-style: dashed; color: var(--ink2); }
+
+  /* ---------- agent layer inner ---------- */
+  .chain {
+    display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+    background: #faf8ff; border: 1px solid #ebe4ff; border-radius: 9px; padding: 9px 11px;
+  }
+  .chain .step {
+    font-size: 11.8px; font-weight: 600; color: #4c2fd0;
+    background: #fff; border: 1px solid #e0d7ff; border-radius: 6px; padding: 4px 9px;
+  }
+  .chain .step--end { background: var(--c-agent); border-color: var(--c-agent); color: #fff; }
+  .chain .ar { color: #b9a8f5; font-size: 12px; font-weight: 700; }
+  .chain .lbl { font-size: 11px; color: var(--ink3); margin-right: 4px; letter-spacing: .4px; }
+
+  .subgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .card {
+    border: 1px solid #ebe4ff; background: #fdfcff; border-radius: 9px; padding: 9px 11px;
+  }
+  .card .ct { font-size: 11.5px; font-weight: 700; color: #4c2fd0; margin-bottom: 7px; letter-spacing: .3px; }
+  .card .cs { font-size: 11px; color: var(--ink3); margin-top: 6px; line-height: 1.5; }
+
+  /* ---------- flow connector ---------- */
+  .flow { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 22px; gap: 0; }
+  .flow i { display: block; width: 2px; height: 13px; background: linear-gradient(180deg, #dbe3ed, #aab8c9); }
+  .flow b { display: block; width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 7px solid #aab8c9; }
+
+  /* ---------- side governance ---------- */
+  .side {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 13px;
+    padding: 14px 13px;
+    display: flex; flex-direction: column; gap: 10px;
+    box-shadow: 0 1px 2px rgba(15,23,42,.03), 0 10px 26px -22px rgba(15,23,42,.45);
+  }
+  .side .st { font-size: 12.5px; font-weight: 700; color: var(--c-gov); display: flex; align-items: center; gap: 6px; }
+  .side .st::before { content: ""; width: 3px; height: 13px; border-radius: 2px; background: var(--c-gov); }
+  .side .sd { font-size: 10.5px; color: var(--ink3); line-height: 1.5; margin-top: -4px; }
+  .side .item {
+    border: 1px solid #f3dfe3; background: #fffafb; border-radius: 8px; padding: 8px 10px;
+  }
+  .side .item .n { font-size: 11.8px; font-weight: 700; color: #a52c40; }
+  .side .item .m { font-size: 10.5px; color: #8a6b72; margin-top: 3px; line-height: 1.45; }
+  .side .fill { flex: 1; }
+
+  /* ---------- external band ---------- */
+  .ext {
+    margin-top: 16px; padding: 13px 16px 14px;
+    border: 1.5px dashed var(--line-strong); border-radius: 13px; background: rgba(255,255,255,.62);
+  }
+  .ext .eh { font-size: 12.5px; font-weight: 700; color: var(--ink2); margin-bottom: 9px; display: flex; align-items: center; gap: 7px; }
+  .ext .eh span { font-size: 11px; font-weight: 500; color: var(--ink3); }
+  .ext .row { gap: 8px; }
+
+  /* ---------- footer ---------- */
+  .foot { margin-top: 16px; display: flex; align-items: center; justify-content: space-between; gap: 18px; padding-top: 14px; border-top: 1px solid var(--line); }
+  .principle { display: flex; align-items: center; gap: 8px; font-size: 11.8px; color: var(--ink2); }
+  .principle b { color: var(--c-agent); }
+  .legend { display: flex; gap: 14px; font-size: 11px; color: var(--ink3); }
+  .legend i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
+</style>
+</head>
+<body>
+<div class="canvas">
+
+  <div class="hdr">
+    <div>
+      <h1>仓储智能管理 Agent 系统 · 总体架构</h1>
+      <div class="sub">WMS 业务底座 + 数据与 IoT 感知层 + AI Agent 智能决策层，四层解耦、自下而上逐级赋能</div>
+    </div>
+    <div class="tag">核心范式：<b>AI 建议 · 人审批 · 动作可审计</b></div>
+  </div>
+
+  <div class="body">
+    <div class="main">
+
+      <!-- L1 接入层 -->
+      <div class="layer">
+        <div class="rail" style="background:linear-gradient(165deg,#5285ff,#3b6ef5)"><div class="num">L1</div><div class="name">接入层</div></div>
+        <div class="lbody">
+          <div class="lhead"><div class="t">接入层 · Access</div><div class="d">人、设备、系统三个方向的统一入口</div></div>
+          <div class="row">
+            <span class="chip chip--key"><i class="dot"></i>运营 Web 工作台</span>
+            <span class="chip chip--key"><i class="dot"></i>PDA / 手持终端</span>
+            <span class="chip chip--key"><i class="dot"></i>大屏看板</span>
+            <span class="chip chip--key"><i class="dot"></i>语音 / IM 助手</span>
+            <span class="chip chip--key"><i class="dot"></i>开放 API / Webhook</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="flow"><i></i><b></b></div>
+
+      <!-- L2 AI Agent 智能层 -->
+      <div class="layer layer--agent">
+        <div class="rail" style="background:linear-gradient(165deg,#8a6dff,#6d4aff)"><div class="num">L2</div><div class="name">智能层</div></div>
+        <div class="lbody">
+          <div class="lhead">
+            <div class="t">AI Agent 智能层 · 核心差异化</div>
+            <div class="d">编排器拆解意图 → 专业 Agent 推理 → 治理链校验 → 工具执行</div>
+          </div>
+
+          <div class="row">
+            <span class="chip chip--agent"><i class="dot"></i>编排器 Orchestrator · Planner / Router</span>
+            <span class="chip chip--ghost">短期记忆 · 会话上下文</span>
+            <span class="chip chip--ghost">RAG 知识库 · SOP / 作业手册</span>
+          </div>
+
+          <div class="subgrid">
+            <div class="card">
+              <div class="ct">专业 Agent 集群（按运营角色划分边界）</div>
+              <div class="row">
+                <span class="chip chip--agent"><i class="dot"></i>库存查询 Agent</span>
+                <span class="chip chip--agent"><i class="dot"></i>补货预测 Agent</span>
+                <span class="chip chip--agent"><i class="dot"></i>上架 / 拣货 Agent</span>
+                <span class="chip chip--agent"><i class="dot"></i>排班调度 Agent</span>
+                <span class="chip chip--agent"><i class="dot"></i>安全合规 Agent</span>
+                <span class="chip chip--agent"><i class="dot"></i>SOP 问答 Agent</span>
+              </div>
+            </div>
+            <div class="card">
+              <div class="ct">MCP 工具层（唯一可写入口，白名单）</div>
+              <div class="row">
+                <span class="chip chip--ghost">查库存</span>
+                <span class="chip chip--ghost">建收货单</span>
+                <span class="chip chip--ghost">建波次</span>
+                <span class="chip chip--ghost">库存调整</span>
+                <span class="chip chip--ghost">发通知</span>
+                <span class="chip chip--ghost">读设备状态</span>
+              </div>
+              <div class="cs">工具入参强类型校验，超出策略包络直接拒绝</div>
+            </div>
+          </div>
+
+          <div class="chain">
+            <span class="lbl">治理链</span>
+            <span class="step">模型网关 ModelGateway</span><span class="ar">&rarr;</span>
+            <span class="step">决策引擎 DecisionEngine</span><span class="ar">&rarr;</span>
+            <span class="step">人机审批 HITL</span><span class="ar">&rarr;</span>
+            <span class="step step--end">动作执行 ActionExecutor</span>
+            <span class="lbl" style="margin-left:auto;margin-right:0">模型：本地 / 云端 LLM 双路由</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="flow"><i></i><b></b></div>
+
+      <!-- L3 业务应用层 -->
+      <div class="layer">
+        <div class="rail" style="background:linear-gradient(165deg,#1cb2be,#0d9aa8)"><div class="num">L3</div><div class="name">业务层</div></div>
+        <div class="lbody">
+          <div class="lhead"><div class="t">业务应用层 · WMS 底座</div><div class="d">所有 AI 动作最终落到这里的标准业务单据</div></div>
+          <div class="row">
+            <span class="chip chip--biz"><i class="dot"></i>入库：预约 / ASN → 收货 → 质检 → 上架</span>
+            <span class="chip chip--biz"><i class="dot"></i>出库：订单 → 波次 → 拣货 → 复核 → 打包 → 发运</span>
+            <span class="chip chip--biz"><i class="dot"></i>库内：移库 / 调拨 / 库存调整</span>
+            <span class="chip chip--biz"><i class="dot"></i>盘点：循环盘点 / 差异处理</span>
+            <span class="chip chip--biz"><i class="dot"></i>库存台账 · 批次效期</span>
+            <span class="chip chip--biz"><i class="dot"></i>报表与看板</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="flow"><i></i><b></b></div>
+
+      <!-- L4 算法策略层 -->
+      <div class="layer">
+        <div class="rail" style="background:linear-gradient(165deg,#eda72b,#e08a00)"><div class="num">L4</div><div class="name">算法层</div></div>
+        <div class="lbody">
+          <div class="lhead"><div class="t">算法与策略层</div><div class="d">确定性的运筹优化，与 LLM 推理分离，保证结果可复现</div></div>
+          <div class="row">
+            <span class="chip chip--algo"><i class="dot"></i>库位分配</span>
+            <span class="chip chip--algo"><i class="dot"></i>波次策略</span>
+            <span class="chip chip--algo"><i class="dot"></i>拣货路径优化</span>
+            <span class="chip chip--algo"><i class="dot"></i>需求预测</span>
+            <span class="chip chip--algo"><i class="dot"></i>安全库存 / 补货点</span>
+            <span class="chip chip--algo"><i class="dot"></i>FEFO / FIFO 规则</span>
+            <span class="chip chip--algo"><i class="dot"></i>装载与车辆调度</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="flow"><i></i><b></b></div>
+
+      <!-- L5 数据层 -->
+      <div class="layer">
+        <div class="rail" style="background:linear-gradient(165deg,#23b87e,#12a06a)"><div class="num">L5</div><div class="name">数据层</div></div>
+        <div class="lbody">
+          <div class="lhead"><div class="t">数据层</div><div class="d">结构化事务 + 向量语义 + 时序遥测，三类存储各司其职</div></div>
+          <div class="row">
+            <span class="chip chip--data"><i class="dot"></i>关系库 PostgreSQL / MySQL</span>
+            <span class="chip chip--data"><i class="dot"></i>缓存 Redis</span>
+            <span class="chip chip--data"><i class="dot"></i>向量库 pgvector / Milvus</span>
+            <span class="chip chip--data"><i class="dot"></i>时序库 TimescaleDB</span>
+            <span class="chip chip--data"><i class="dot"></i>对象存储 · 单据影像</span>
+            <span class="chip chip--data"><i class="dot"></i>数仓 / BI 数据集市</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="flow"><i></i><b></b></div>
+
+      <!-- L6 感知设备层 -->
+      <div class="layer">
+        <div class="rail" style="background:linear-gradient(165deg,#738297,#5c6b80)"><div class="num">L6</div><div class="name">感知层</div></div>
+        <div class="lbody">
+          <div class="lhead"><div class="t">感知与设备层</div><div class="d">实物世界的入口，数据实时性与幂等性是工程难点</div></div>
+          <div class="row">
+            <span class="chip chip--dev"><i class="dot"></i>条码 / 二维码扫码</span>
+            <span class="chip chip--dev"><i class="dot"></i>RFID 通道门</span>
+            <span class="chip chip--dev"><i class="dot"></i>电子标签 PTL</span>
+            <span class="chip chip--dev"><i class="dot"></i>AGV / AMR</span>
+            <span class="chip chip--dev"><i class="dot"></i>温湿度 / 冷库传感</span>
+            <span class="chip chip--dev"><i class="dot"></i>电子秤 / 称重</span>
+            <span class="chip chip--dev"><i class="dot"></i>视频与视觉识别</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- 横向治理 -->
+    <aside class="side">
+      <div class="st">横向治理与安全</div>
+      <div class="sd">贯穿六层，非可选模块</div>
+      <div class="item"><div class="n">身份与权限 RBAC</div><div class="m">用户 / 角色 / 数据行级隔离，多仓多货主场景必备</div></div>
+      <div class="item"><div class="n">审计与全链路追溯</div><div class="m">每条 AI 建议、审批、执行的完整证据链，可回放</div></div>
+      <div class="item"><div class="n">AI 护栏 Guardrails</div><div class="m">提示注入防护、越权动作拦截、输出合规校验</div></div>
+      <div class="item"><div class="n">可观测与告警</div><div class="m">指标 / 日志 / 链路追踪，模型调用成本与延迟监控</div></div>
+      <div class="item"><div class="n">容灾与备份</div><div class="m">库存账实一致性校验、定时快照与恢复演练</div></div>
+      <div class="fill"></div>
+      <div class="item" style="border-color:#ddd5ff;background:#faf8ff">
+        <div class="n" style="color:#4c2fd0">关键约束</div>
+        <div class="m" style="color:#6b5aa8">LLM 不直接持有写权限；确有风险的动作强制进入人工审批队列，且审批单可过期、单次有效</div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- 外部系统 -->
+  <div class="ext">
+    <div class="eh">外部系统与上下游 <span>经 API / 中间件集成，不直接访问内部数据库</span></div>
+    <div class="row">
+      <span class="chip chip--ghost"><i class="dot"></i>ERP · SAP / 用友 / 金蝶</span>
+      <span class="chip chip--ghost"><i class="dot"></i>OMS 订单中心</span>
+      <span class="chip chip--ghost"><i class="dot"></i>TMS 运输管理</span>
+      <span class="chip chip--ghost"><i class="dot"></i>电商平台 / 门店</span>
+      <span class="chip chip--ghost"><i class="dot"></i>供应商协同 SRM</span>
+      <span class="chip chip--ghost"><i class="dot"></i>WCS / 设备控制系统</span>
+      <span class="chip chip--ghost"><i class="dot"></i>企业微信 / 邮件通知</span>
+    </div>
+  </div>
+
+  <div class="foot">
+    <div class="principle"><b>设计原则</b>：智能与操作权限分离 —— AI 可以在策略包络内自适应推理，但任何改变实物状态的动作都必须确定性校验、显式审批、事后可审计。</div>
+    <div class="legend">
+      <span><i style="background:#3b6ef5"></i>接入</span>
+      <span><i style="background:#6d4aff"></i>智能</span>
+      <span><i style="background:#0d9aa8"></i>业务</span>
+      <span><i style="background:#e08a00"></i>算法</span>
+      <span><i style="background:#12a06a"></i>数据</span>
+      <span><i style="background:#5c6b80"></i>设备</span>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

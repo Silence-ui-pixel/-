@@ -1,0 +1,75 @@
+name: canku
+
+# 本地开发编排。目标：`docker compose up -d` 一条命令起全套。
+# 不引入 K8s / 不引入反向代理 —— 两人团队在 P0 阶段要的是「立刻能跑」，
+# 不是「架构完整」。等 P3 需要多环境时再谈。
+
+services:
+  db:
+    image: postgres:16
+    container_name: canku-db
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-canku}
+      POSTGRES_USER: ${POSTGRES_USER:-canku}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-canku_dev}
+      # 时区必须显式设置：否则 now() 存 UTC，仓库作业按本地时间统计会错一天
+      TZ: Asia/Shanghai
+      PGTZ: Asia/Shanghai
+    ports:
+      # 只绑 127.0.0.1，不对外暴露
+      - "127.0.0.1:${DB_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # 只读挂载 SQL 脚本，供 db-init 在容器内执行（不需要宿主机装 psql）
+      - ./db:/sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-canku} -d ${POSTGRES_DB:-canku}"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ./api
+    container_name: canku-api
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-canku}:${POSTGRES_PASSWORD:-canku_dev}@db:5432/${POSTGRES_DB:-canku}
+      APP_ENV: ${APP_ENV:-dev}
+      LOG_LEVEL: ${LOG_LEVEL:-DEBUG}
+      TZ: Asia/Shanghai
+    ports:
+      - "127.0.0.1:${API_PORT:-8000}:8000"
+    volumes:
+      # 代码挂载 + --reload，改完文件不用重建镜像
+      - ./api:/app
+    depends_on:
+      db:
+        condition: service_healthy
+    command: python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # web 由成员 B 负责（S1-10 前端骨架）。
+  # A 不在这里替 B 定义前端容器 —— 目录名、构建命令、端口是 B 的决定权，
+  # 写死在这里等于替 B 做技术选型，后面必然返工。
+  # 已与 B 约定的接口是：目录 web/、端口 5173、启动命令 npm run dev。
+  # B 只需取消下面的注释并实现 web/Dockerfile。
+  # ---------------------------------------------------------------------------
+  # web:
+  #   build:
+  #     context: ./web
+  #   container_name: canku-web
+  #   ports:
+  #     - "127.0.0.1:${WEB_PORT:-5173}:5173"
+  #   volumes:
+  #     - ./web:/app
+  #     - /app/node_modules
+  #   depends_on:
+  #     - api
+  #   command: npm run dev -- --host 0.0.0.0
+  #   restart: unless-stopped
+
+volumes:
+  pgdata:

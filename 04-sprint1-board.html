@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sprint 1 任务分工 · 两人两周</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f4f6fa; --ink: #0f172a; --ink2: #56657c; --ink3: #8a97a8;
+    --line: #e3e9f0; --blue: #3b6ef5; --purple: #6d4aff; --teal: #0d9aa8;
+    --amber: #e08a00; --red: #d6455d; --green: #12a06a; --slate: #5c6b80;
+  }
+
+  body {
+    font-family: "Segoe UI", "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+    background: var(--bg); color: var(--ink); -webkit-font-smoothing: antialiased;
+    line-height: 1.6; padding: 32px 24px 48px;
+  }
+
+  .doc {
+    width: 1120px; margin: 0 auto;
+    background:
+      radial-gradient(900px 400px at 5% -8%, #e9eefc 0%, rgba(233,238,252,0) 58%),
+      radial-gradient(820px 380px at 97% 0%, #f1eaff 0%, rgba(241,234,255,0) 56%),
+      #f8fafd;
+    border: 1px solid var(--line); border-radius: 20px; padding: 34px 40px 36px;
+    box-shadow: 0 1px 2px rgba(15,23,42,.04), 0 24px 60px -34px rgba(15,23,42,.24);
+  }
+
+  .hdr { padding-bottom: 20px; border-bottom: 1px solid var(--line); margin-bottom: 26px; }
+  .hdr h1 { font-size: 24px; font-weight: 700; letter-spacing: .3px; display: flex; align-items: center; gap: 11px; }
+  .hdr h1::before { content: ""; width: 5px; height: 25px; border-radius: 3px; background: linear-gradient(180deg, var(--teal), var(--purple)); }
+  .hdr .sub { font-size: 12.5px; color: var(--ink2); margin: 8px 0 0 16px; }
+  .badges { display: flex; gap: 8px; margin: 13px 0 0 16px; flex-wrap: wrap; }
+  .badges span { font-size: 11px; padding: 4px 10px; border-radius: 999px; background: #fff; border: 1px solid var(--line); color: var(--ink2); }
+  .badges span b { color: var(--teal); }
+
+  section { margin-bottom: 30px; }
+  .sh { display: flex; align-items: center; gap: 10px; margin-bottom: 13px; }
+  .sh .no { flex: 0 0 auto; width: 22px; height: 22px; border-radius: 6px; background: var(--blue); color: #fff;
+    font-size: 11.5px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+  .sh.t .no { background: var(--teal); }
+  .sh.p .no { background: var(--purple); }
+  .sh.a .no { background: var(--amber); }
+  .sh.r .no { background: var(--red); }
+  .sh h2 { font-size: 16.5px; font-weight: 700; }
+  .sh .hint { font-size: 11.5px; color: var(--ink3); }
+
+  p { font-size: 13.2px; color: #2c3a52; }
+  p + p { margin-top: 9px; }
+  code { font-family: Consolas, "Courier New", monospace; font-size: 11.6px;
+    background: #eef3fb; padding: 1px 5px; border-radius: 4px; color: #1d4ed8; }
+
+  /* principles */
+  .prin { display: grid; grid-template-columns: repeat(4, 1fr); gap: 11px; }
+  .pi { background: #fff; border: 1px solid var(--line); border-radius: 11px; padding: 13px 14px;
+    border-top: 3px solid var(--teal); box-shadow: 0 1px 2px rgba(15,23,42,.03); }
+  .pi:nth-child(2) { border-top-color: var(--purple); }
+  .pi:nth-child(3) { border-top-color: var(--amber); }
+  .pi:nth-child(4) { border-top-color: var(--blue); }
+  .pi .pt { font-size: 12.6px; font-weight: 700; margin-bottom: 5px; }
+  .pi .pd { font-size: 11.7px; color: var(--ink2); line-height: 1.55; }
+
+  /* gantt */
+  .gantt { background: #fff; border: 1px solid var(--line); border-radius: 13px; padding: 4px 6px 12px;
+    box-shadow: 0 1px 2px rgba(15,23,42,.03), 0 10px 26px -22px rgba(15,23,42,.45); overflow-x: auto; }
+  .g { display: grid; grid-template-columns: 176px repeat(10, 1fr); align-items: center; min-width: 980px; }
+  .g-head-day { display: grid; grid-template-columns: 176px repeat(10, 1fr); padding: 8px 0 4px;
+    border-bottom: 1px solid var(--line); margin-bottom: 2px; }
+  .g-day { font-size: 10.5px; font-weight: 700; color: var(--ink3); text-align: center; letter-spacing: .5px; }
+  .g-lbl { font-size: 11.6px; color: #26364d; padding: 0 8px 0 10px; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis; }
+  .g-week { grid-column: 1 / -1; display: grid; grid-template-columns: 176px repeat(10, 1fr);
+    margin: 4px 0 3px; }
+  .g-week div { font-size: 10.5px; font-weight: 700; color: #fff; background: var(--slate);
+    padding: 3px 8px; border-radius: 4px; margin-right: 3px; }
+  .g-week .d1 { grid-column: 2 / 7; }
+  .g-week .d2 { grid-column: 7 / 12; background: #7d8ea3; }
+  .g-lane { grid-column: 1 / -1; display: grid; grid-template-columns: 176px repeat(10, 1fr);
+    margin: 9px 0 4px; align-items: center; }
+  .g-lane .ln { grid-column: 1 / -1; font-size: 11.5px; font-weight: 700; padding-left: 2px; }
+  .g-lane .ln.a { color: var(--teal); }
+  .g-lane .ln.b { color: var(--purple); }
+  .g-row { display: contents; }
+  .bar { font-size: 10.4px; color: #fff; padding: 4px 7px; border-radius: 5px; margin: 2px 2px; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis; }
+  .bar.a { background: linear-gradient(90deg, #1cb2be, var(--teal)); }
+  .bar.b { background: linear-gradient(90deg, #8a6dff, var(--purple)); }
+  .bar.s { background: linear-gradient(90deg, #5285ff, var(--blue)); }
+  .bar.ghost { background: #eef2f7; color: #7d8ea3; }
+  .g-spacer { height: 4px; }
+
+  /* table */
+  table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 12.2px; }
+  thead th { text-align: left; font-size: 10.8px; font-weight: 700; color: var(--ink2);
+    padding: 8px 10px; background: #f1f5f9; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); letter-spacing: .3px; }
+  thead th:first-child { border-left: 1px solid var(--line); border-radius: 9px 0 0 0; }
+  thead th:last-child { border-right: 1px solid var(--line); border-radius: 0 9px 0 0; }
+  tbody td { padding: 8px 10px; border-bottom: 1px solid #eef2f7; vertical-align: top; color: #2c3a52; line-height: 1.5; }
+  tbody td:first-child { border-left: 1px solid var(--line); font-family: Consolas, monospace; font-size: 11.4px; color: var(--blue); font-weight: 600; white-space: nowrap; }
+  tbody td:last-child { border-right: 1px solid var(--line); }
+  tbody tr:nth-child(even) td { background: #fcfdff; }
+  tbody tr:last-child td { border-bottom: 1px solid var(--line); }
+  .who { display: inline-block; font-size: 10.5px; font-weight: 700; padding: 1px 7px; border-radius: 4px; }
+  .who.a { background: #eaf9fa; color: #0a7381; }
+  .who.b { background: #f3efff; color: #4c2fd0; }
+  .who.ab { background: #eef3ff; color: #1e4bd8; }
+  .pd-n { font-family: Consolas, monospace; font-size: 11.4px; color: var(--ink2); white-space: nowrap; }
+  .dep { font-family: Consolas, monospace; font-size: 10.6px; color: var(--ink3); }
+
+  /* day plan */
+  .today { background: #fff; border: 1px solid #d9e6ff; border-radius: 13px; overflow: hidden;
+    box-shadow: 0 1px 2px rgba(59,110,245,.06), 0 12px 28px -22px rgba(59,110,245,.5); }
+  .today-hd { background: linear-gradient(135deg, #5285ff, var(--blue)); color: #fff; padding: 12px 18px; }
+  .today-hd .t1 { font-size: 14px; font-weight: 700; }
+  .today-hd .t2 { font-size: 11.5px; opacity: .85; margin-top: 2px; }
+  .today-bd { padding: 6px 18px 14px; }
+  .tt { display: flex; gap: 13px; padding: 11px 0; border-bottom: 1px dashed #eef2f7; }
+  .tt:last-child { border-bottom: 0; }
+  .tt .tm { flex: 0 0 88px; font-family: Consolas, monospace; font-size: 11.4px; font-weight: 700; color: var(--blue); }
+  .tt .tb { font-size: 12.5px; }
+  .tt .tb b { display: block; margin-bottom: 2px; }
+  .tt .tb span { color: var(--ink2); }
+
+  /* red line */
+  .lines { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .rl { background: #fff; border: 1px solid var(--line); border-radius: 11px; padding: 13px 15px; }
+  .rl .rh { font-size: 12.4px; font-weight: 700; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+  .rl .rh i { width: 3px; height: 12px; border-radius: 2px; display: inline-block; }
+  .rl.a .rh { color: #0a7381; } .rl.a .rh i { background: var(--teal); }
+  .rl.b .rh { color: #4c2fd0; } .rl.b .rh i { background: var(--purple); }
+  .rl ul { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+  .rl li { font-size: 12px; color: #2c3a52; padding-left: 14px; position: relative; }
+  .rl li::before { content: ""; position: absolute; left: 1px; top: 7px; width: 4px; height: 4px; border-radius: 50%; background: #c3cfdd; }
+  .forbid { margin-top: 12px; background: #fff8f9; border: 1px solid #f3dfe3; border-radius: 11px; padding: 13px 16px; }
+  .forbid .fh { font-size: 12.4px; font-weight: 700; color: #a52c40; margin-bottom: 7px; }
+  .forbid .fl { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 20px; }
+  .forbid .fi { font-size: 12px; color: #6b4a51; padding-left: 15px; position: relative; }
+  .forbid .fi::before { content: "\00d7"; position: absolute; left: 2px; top: -1px; color: #d69aa5; font-weight: 700; }
+
+  /* demo */
+  .demos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .dm { background: #fff; border: 1px solid var(--line); border-radius: 11px; padding: 14px 15px; position: relative; }
+  .dm .dn2 { font-family: Consolas, monospace; font-size: 20px; font-weight: 700; color: #e6ecf5; line-height: 1; }
+  .dm .dt { font-size: 12.8px; font-weight: 700; margin: 6px 0 5px; }
+  .dm .dd { font-size: 11.8px; color: var(--ink2); line-height: 1.55; }
+  .dm.ok { border-color: #cfeadd; background: #fbfefd; }
+  .dm.ok .dn2 { color: #d6f0e4; }
+
+  /* risk */
+  .rrow { display: flex; gap: 11px; padding: 10px 0; border-bottom: 1px dashed #eef2f7; align-items: flex-start; }
+  .rrow:last-child { border-bottom: 0; }
+  .rlv { flex: 0 0 auto; font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 4px; background: #fdeaf0; color: #b02a44; }
+  .rlv.m { background: #fff5e0; color: #96600a; }
+  .rb { font-size: 12.3px; }
+  .rb b { display: block; margin-bottom: 2px; }
+  .rb span { color: var(--ink2); }
+
+  .card { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 14px 17px;
+    box-shadow: 0 1px 2px rgba(15,23,42,.03), 0 8px 20px -18px rgba(15,23,42,.5); }
+
+  .call { border-left: 3px solid var(--amber); background: #fffaf0; border-radius: 8px; padding: 11px 15px; }
+  .call .ct { font-size: 12.4px; font-weight: 700; color: #8a5a05; margin-bottom: 4px; }
+  .call p { font-size: 12.4px; color: #6b5326; }
+
+  .foot { margin-top: 28px; padding-top: 15px; border-top: 1px solid var(--line);
+    font-size: 11.5px; color: var(--ink3); display: flex; justify-content: space-between; gap: 20px; }
+</style>
+</head>
+<body>
+<div class="doc">
+
+  <div class="hdr">
+    <h1>Sprint 1 · 两人两周任务分工</h1>
+    <div class="sub">W1–W2 / Phase 0 定基线：目标不是写功能，是让两个人能安全并行</div>
+    <div class="badges">
+      <span>周期 <b>10</b> 个工作日</span>
+      <span>任务卡 <b>16</b> 张</span>
+      <span>合计 <b>14.5</b> 人天 / 可用 20 人天</span>
+      <span>缓冲 <b>27.5%</b></span>
+    </div>
+  </div>
+
+  <!-- 1 分工原则 -->
+  <section>
+    <div class="sh t"><div class="no">1</div><h2>分任务的四条原则</h2><span class="hint">先理解这个，再分任务才不会白干</span></div>
+    <div class="prin">
+      <div class="pi"><div class="pt">按交付物分，不按技术栈分</div><div class="pd">「A 做后端、B 做前端」是假分工。真分工是「A 交付 <code>stock_service</code>，B 交付可演示的库存页」，各自对结果负责。</div></div>
+      <div class="pi"><div class="pt">先解依赖，再谈并行</div><div class="pd">两个人能不能并行，只取决于<b>有没有契约</b>。契约没冻结之前，强行并行就是互相等待。</div></div>
+      <div class="pi"><div class="pt">每张卡必须有验收标准</div><div class="pd">没有 DoD 的任务不叫任务，叫「打算做」。验收标准要能让对方独立判断是否完成。</div></div>
+      <div class="pi"><div class="pt">谁都不许空转</div><div class="pd">2 人团队最贵的成本是一个人等另一个。策略是：<b>B 永远先做 mock，A 永远先写接口签名</b>。</div></div>
+    </div>
+  </section>
+
+  <!-- 2 甘特 -->
+  <section>
+    <div class="sh"><div class="no">2</div><h2>两周双泳道排期</h2><span class="hint">绿=A 领域与账务 · 紫=B 交互与智能 · 蓝=两人一起</span></div>
+
+    <div class="gantt">
+      <div class="g-head-day">
+        <div></div>
+        <div class="g-day">D1</div><div class="g-day">D2</div><div class="g-day">D3</div><div class="g-day">D4</div><div class="g-day">D5</div>
+        <div class="g-day">D6</div><div class="g-day">D7</div><div class="g-day">D8</div><div class="g-day">D9</div><div class="g-day">D10</div>
+      </div>
+
+      <div class="g-week"><div class="d1">第 1 周 · 定基线</div><div class="d2">第 2 周 · 冻结契约</div></div>
+
+      <div class="g">
+        <div class="g-lane"><div class="ln a">成员 A · 领域与账务</div></div>
+
+        <div class="g-row"><div class="g-lbl">S1-01 现场跟单调研</div><div class="bar s" style="grid-column:2/3">调研</div></div>
+        <div class="g-row"><div class="g-lbl">S1-02/03 范围与指标</div><div class="bar s" style="grid-column:3/4">范围</div></div>
+        <div class="g-row"><div class="g-lbl">S1-04 模型评审冻结</div><div class="bar s" style="grid-column:4/5">评审</div></div>
+        <div class="g-row"><div class="g-lbl">S1-05 仓库骨架 + CI</div><div class="bar a" style="grid-column:5/6">骨架</div></div>
+        <div class="g-row"><div class="g-lbl">S1-06 迁移落地</div><div class="bar a" style="grid-column:6/7">migrate</div></div>
+        <div class="g-row"><div class="g-lbl">S1-07 接口清单</div><div class="bar a" style="grid-column:6/7">&nbsp;</div></div>
+        <div class="g-row"><div class="g-lbl">S1-08 OpenAPI v1.0</div><div class="bar a" style="grid-column:7/9">写契约</div></div>
+        <div class="g-row"><div class="g-lbl">S1-09 契约评审冻结</div><div class="bar s" style="grid-column:9/10">冻结</div></div>
+        <div class="g-row"><div class="g-lbl">S1-15 apply_txn 设计+单测</div><div class="bar ghost" style="grid-column:10/12">先写测试</div></div>
+
+        <div class="g-lane" style="margin-top:14px"><div class="ln b">成员 B · 交互与智能</div></div>
+
+        <div class="g-row"><div class="g-lbl">S1-01 现场跟单调研</div><div class="bar s" style="grid-column:2/3">调研</div></div>
+        <div class="g-row"><div class="g-lbl">S1-02/03 范围与指标</div><div class="bar s" style="grid-column:3/4">范围</div></div>
+        <div class="g-row"><div class="g-lbl">S1-04 模型评审冻结</div><div class="bar s" style="grid-column:4/5">评审</div></div>
+        <div class="g-row"><div class="g-lbl">S1-10 前端骨架 + 工作台</div><div class="bar b" style="grid-column:5/7">骨架 / 布局</div></div>
+        <div class="g-row"><div class="g-lbl">S1-12 Mock server</div><div class="bar b" style="grid-column:7/9">手写假数据</div></div>
+        <div class="g-row"><div class="g-lbl">S1-11 生成 TS client</div><div class="bar b" style="grid-column:9/10">生成</div></div>
+        <div class="g-row"><div class="g-lbl">S1-13 库存查询页</div><div class="bar b" style="grid-column:10/11">页面</div></div>
+        <div class="g-row"><div class="g-lbl">S1-14 PDA 扫码原型</div><div class="bar b" style="grid-column:11/12">H5</div></div>
+        <div class="g-row"><div class="g-lbl">S1-16 复盘 + W3 排期</div><div class="bar s" style="grid-column:11/12">&nbsp;</div></div>
+      </div>
+    </div>
+
+    <div class="call" style="margin-top:13px">
+      <div class="ct">这张图真正想说的是</div>
+      <p>D1–D4 两人高度重叠 —— 该重叠，因为模型和范围必须一起定。D5 之后开始分叉。<b>B 从 D5 到 D8 几乎不依赖 A</b>，因为他在做骨架和 mock，用的是自己编的假数据。这就是「先 mock 后联调」的价值：两周里没有一天是 B 坐在那里等接口。</p>
+    </div>
+  </section>
+
+  <!-- 3 任务卡 -->
+  <section>
+    <div class="sh p"><div class="no">3</div><h2>16 张任务卡</h2><span class="hint">可直接抄进飞书 / TAPD / Excel（同目录有 CSV）</span></div>
+
+    <table>
+      <thead>
+        <tr>
+          <th style="width:64px">编号</th>
+          <th style="width:212px">任务</th>
+          <th style="width:56px">负责</th>
+          <th style="width:48px">人天</th>
+          <th style="width:86px">依赖</th>
+          <th>完成标准（DoD）</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>S1-01</td><td>仓库现场跟单调研</td><td><span class="who ab">A+B</span></td><td class="pd-n">2.0</td><td class="dep">—</td><td>跟完一个真实订单全程；产出一张流程现状图 + 三个「系统外动作」清单（哪里在用微信/纸质代替系统）</td></tr>
+        <tr><td>S1-02</td><td>一页纸范围声明</td><td><span class="who ab">A+B</span></td><td class="pd-n">1.0</td><td class="dep">S1-01</td><td>半页写做什么、半页写不做，双方确认并打印贴在墙上；后续加需求必须走「换出机制」</td></tr>
+        <tr><td>S1-03</td><td>3 个痛点 + 3 个可量化指标</td><td><span class="who ab">A+B</span></td><td class="pd-n">0.5</td><td class="dep">S1-01</td><td>每条痛点都有<b>当前基线值</b>和<b>目标值</b>（例：找货 8 分钟 → 3 分钟）；没有基线的不算</td></tr>
+        <tr><td>S1-04</td><td>领域模型评审并冻结 v1.0</td><td><span class="who ab">A+B</span></td><td class="pd-n">1.0</td><td class="dep">—</td><td>8 张表逐字段过一遍；所有修改记入 changelog；冻结后改表需两人同时在场</td></tr>
+        <tr><td>S1-05</td><td>仓库骨架 + docker-compose + CI</td><td><span class="who a">A</span></td><td class="pd-n">1.0</td><td class="dep">—</td><td>干净机器 <code>make up</code> 一条命令起 DB+API+Web；CI 跑通 lint + 单测</td></tr>
+        <tr><td>S1-06</td><td>数据库迁移落地（alembic）</td><td><span class="who a">A</span></td><td class="pd-n">0.5</td><td class="dep">S1-05</td><td><code>alembic upgrade head</code> 成功；<code>v_inventory_recon</code> 查询返回全部 OK；种子数据可重复导入</td></tr>
+        <tr><td>S1-07</td><td>接口清单梳理（不实现）</td><td><span class="who a">A</span></td><td class="pd-n">0.5</td><td class="dep">S1-04</td><td>列出本期全部接口，逐个标注「读 / 写」和「是否需要审批」，B 能看懂</td></tr>
+        <tr><td>S1-08</td><td>OpenAPI 契约 v1.0</td><td><span class="who a">A</span></td><td class="pd-n">1.5</td><td class="dep">S1-07</td><td>每个接口有请求/响应 schema、错误码枚举、至少一个示例；<code>openapi-generator validate</code> 无错</td></tr>
+        <tr><td>S1-09</td><td>契约评审并冻结</td><td><span class="who ab">A+B</span></td><td class="pd-n">0.5</td><td class="dep">S1-08</td><td>双方逐条过；冻结后<b>只增字段不改语义</b>；B 确认能据此做出全部页面</td></tr>
+        <tr><td>S1-10</td><td>前端骨架 + 工作台布局</td><td><span class="who b">B</span></td><td class="pd-n">1.0</td><td class="dep">S1-05</td><td>能起、能登录（假 token）、有侧边菜单和统一表格/表单封装组件</td></tr>
+        <tr><td>S1-11</td><td>从 OpenAPI 生成 TS 类型 + client</td><td><span class="who b">B</span></td><td class="pd-n">0.5</td><td class="dep">S1-08</td><td>一条 <code>npm run gen</code> 重新生成；类型零报错；改契约后能自动化更新</td></tr>
+        <tr><td>S1-12</td><td>Mock server（按契约返回假数据）</td><td><span class="who b">B</span></td><td class="pd-n">0.5</td><td class="dep">S1-08</td><td>前端<b>不连后端</b>也能跑通全部页面；假数据覆盖正常、空态、异常三种</td></tr>
+        <tr><td>S1-13</td><td>库存查询页（对 mock）</td><td><span class="who b">B</span></td><td class="pd-n">1.0</td><td class="dep">S1-10/12</td><td>可按 SKU、库位查；分页、空态、加载态正常；PDA 尺寸下不塌</td></tr>
+        <tr><td>S1-14</td><td>PDA 扫码页原型（H5）</td><td><span class="who b">B</span></td><td class="pd-n">1.0</td><td class="dep">S1-12</td><td>手机浏览器可用；扫码输入框自动聚焦；软键盘弹出不遮输入区</td></tr>
+        <tr><td>S1-15</td><td>apply_txn 设计与单测骨架</td><td><span class="who a">A</span></td><td class="pd-n">1.5</td><td class="dep">S1-06</td><td>五个步骤写成测试用例（先全部红）；覆盖正常、库存不足、并发扣减、重复提交四种场景</td></tr>
+        <tr><td>S1-16</td><td>Sprint 复盘 + W3 排期</td><td><span class="who ab">A+B</span></td><td class="pd-n">0.5</td><td class="dep">全部</td><td>复盘出 3 条改进；W3 任务卡已建好并估点；范围声明是否要调整有结论</td></tr>
+      </tbody>
+    </table>
+    <p style="margin-top:11px;font-size:12.2px;color:var(--ink3)">
+      合计 14.5 人天，可用 20 人天。按人分摊：<b>A 约 7.75 天、B 约 6.75 天</b>（共同任务各占一半），两人都留了 2 天以上余量。<b>不要把余量填满</b>，两个人做新系统一定会有预料不到的事。A 略重是刻意的 —— 库存服务是这块业务里唯一真正难的地方，别为了"公平"把它切一半给两个人。
+    </p>
+  </section>
+
+  <!-- 4 今天下午 -->
+  <section>
+    <div class="sh a"><div class="no">4</div><h2>今天下午就能开始：3 小时</h2><span class="hint">不用等环境、不用等预算</span></div>
+
+    <div class="today">
+      <div class="today-hd">
+        <div class="t1">第一步不在电脑上，在纸上</div>
+        <div class="t2">两人各自拿一张纸，背对背写，不许讨论 —— 这样才能看出你们对痛点的认知差多少</div>
+      </div>
+      <div class="today-bd">
+        <div class="tt"><div class="tm">0:00–0:30</div><div class="tb"><b>各写 3 条最痛的作业场景</b><span>规则：写「痛点」不写「功能」。✗「要有个库存查询页面」 ✓「找一个货要翻三个系统还经常找不到」</span></div></div>
+        <div class="tt"><div class="tm">0:30–1:30</div><div class="tb"><b>交换纸条，找交集</b><span>两人列表里都出现的那条，就是 MVP 的主攻场景。一条都没重合，说明你们需要先去现场，而不是先分工。</span></div></div>
+        <div class="tt"><div class="tm">1:30–2:30</div><div class="tb"><b>给选中的痛点定基线</b><span>现在这件事要多久 / 错多少 / 花几个人？写一个数字。这个数字就是 14 周后验收你的唯一依据。</span></div></div>
+        <div class="tt"><div class="tm">2:30–3:00</div><div class="tb"><b>建 Git 仓库，各推一个 commit</b><span>别小看这步：两人都能 push、都能跑起来，才叫团队。这一步不通，后面全是空谈。</span></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5 红线 -->
+  <section>
+    <div class="sh r"><div class="no">5</div><h2>谁能改什么（红线）</h2><span class="hint">这条比任务表更重要，它是两人不打架的前提</span></div>
+
+    <div class="lines">
+      <div class="rl a">
+        <div class="rh"><i></i>A 独占的目录</div>
+        <ul>
+          <li><code>db/</code> — 迁移脚本、种子数据</li>
+          <li><code>app/domain/</code> — 领域模型、状态机</li>
+          <li><code>app/services/stock/</code> — 库存唯一写入口</li>
+          <li><code>app/repositories/</code> — 数据访问</li>
+          <li><code>contracts/</code> — 契约文件，<b>只有 A 能改</b></li>
+        </ul>
+      </div>
+      <div class="rl b">
+        <div class="rh"><i></i>B 独占的目录</div>
+        <ul>
+          <li><code>web/</code> — 全部前端代码</li>
+          <li><code>app/agent/</code> — 编排器、Agent、Prompt</li>
+          <li><code>mocks/</code> — 假数据</li>
+          <li><code>docs/</code> — 界面原型、流程图</li>
+          <li>契约要改 → <b>提 issue 给 A</b>，不自己动手</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="forbid">
+      <div class="fh">两人都不许做的事</div>
+      <div class="fl">
+        <div class="fi"><b>B 不许直接连数据库查表</b> —— 一切走接口，否则表结构一变就双双崩溃</div>
+        <div class="fi"><b>谁都不许直接 UPDATE inventory</b> —— 只能调 stock_service</div>
+        <div class="fi">不许在 <code>main</code> 上直接提交，一律短分支 + PR 互审</div>
+        <div class="fi">不许改对方的独占目录，要改先开 issue 说清原因</div>
+        <div class="fi">不许静默改契约 —— 改完必须当天通知对方</div>
+        <div class="fi">不许用「我本地是好的」结束一个 bug 讨论</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6 验收 -->
+  <section>
+    <div class="sh t"><div class="no">6</div><h2>Sprint 1 结束必须能演示这三件事</h2><span class="hint">做不到就不进 Sprint 2，宁可延长一周</span></div>
+    <div class="demos">
+      <div class="dm ok">
+        <div class="dn2">01</div>
+        <div class="dt">一条命令起全套</div>
+        <div class="dd">在一台<b>没参与开发</b>的机器上，<code>git clone</code> + <code>make up</code>，10 分钟内看到登录页、进得去、库存页有数据。</div>
+      </div>
+      <div class="dm ok">
+        <div class="dn2">02</div>
+        <div class="dt">前端调的是真接口</div>
+        <div class="dd">库存查询页已经从 mock 切到真实 API，返回的是数据库里那 1 条期初库存，不是写死的假数据。</div>
+      </div>
+      <div class="dm ok">
+        <div class="dn2">03</div>
+        <div class="dt">两份冻结的文件</div>
+        <div class="dd">一页纸范围声明（含不做清单）+ 契约 v1.0。<b>这两份文件决定了后面 12 周会不会返工。</b></div>
+      </div>
+    </div>
+
+    <div class="call" style="margin-top:13px">
+      <div class="ct">如果只做到两件</div>
+      <p>优先保 <b>03</b>。Sprint 1 的产物不是功能，是「让后面 12 周能并行的两个前提」。功能做得再花，契约没冻结，第 3 周开始就是无休止的对齐和返工。</p>
+    </div>
+  </section>
+
+  <!-- 7 节奏 -->
+  <section>
+    <div class="sh p"><div class="no">7</div><h2>节奏与风险</h2></div>
+    <div class="card">
+      <div class="rrow"><span class="rlv m">每天</span><div class="rb"><b>站会 10 分钟，只回答三问</b><span>昨天完成了什么卡 / 今天做哪张卡 / 有没有被谁卡住。不讨论技术方案，超时就拉小会。</span></div></div>
+      <div class="rrow"><span class="rlv m">每周三</span><div class="rb"><b>半天联调</b><span>固定时间，两人同时在线，把前后端真接一次。不要等到 Sprint 末才发现对不上。</span></div></div>
+      <div class="rrow"><span class="rlv m">每周五</span><div class="rb"><b>Demo 30 分钟</b><span>只演示能点、能跑的东西。PPT 和截图不接受。演示不了就说明这周没产出。</span></div></div>
+      <div class="rrow"><span class="rlv">风险 1</span><div class="rb"><b>现场调研拖成两周</b><span>限时 <b>1 天</b>。调研永远做不完，你需要的是「够开始」而不是「够完整」。</span></div></div>
+      <div class="rrow"><span class="rlv">风险 2</span><div class="rb"><b>契约反复改</b><span>冻结后只增不改语义。真要改，两人同时在场改，改完当天同步。</span></div></div>
+      <div class="rrow"><span class="rlv">风险 3</span><div class="rb"><b>B 空转等接口</b><span>解法写在排期里了：mock 先行。B 手上永远有一张不依赖 A 的卡。</span></div></div>
+      <div class="rrow"><span class="rlv">风险 4</span><div class="rb"><b>Sprint 1 想顺手写业务功能</b><span>忍住。这两周唯一目标是「能安全并行」。提前写业务 = 表结构还没定就写代码 = 必然返工。</span></div></div>
+    </div>
+  </section>
+
+  <div class="foot">
+    <span>Sprint 1 任务分工 · 配套 02-kickoff-plan.html / 03-data-model.html</span>
+    <span>人天为估算值，首次跑完 Sprint 后按实际校准</span>
+  </div>
+
+</div>
+</body>
+</html>

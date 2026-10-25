@@ -1,0 +1,24 @@
+:root {
+  --wms-primary: #3b6ef5;
+  --wms-sidebar-bg: #1f2937;
+  --wms-sidebar-text: #cbd5e1;
+  --wms-sidebar-active: #3b6ef5;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: "Segoe UI", "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  background: #f4f6fa;
+}

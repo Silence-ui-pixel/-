@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>仓储智能管理 Agent 系统 · 启动方案与分工</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f4f6fa;
+    --panel: #ffffff;
+    --ink: #0f172a;
+    --ink2: #56657c;
+    --ink3: #8a97a8;
+    --line: #e3e9f0;
+    --line2: #cbd5e1;
+    --blue: #3b6ef5;
+    --purple: #6d4aff;
+    --teal: #0d9aa8;
+    --amber: #e08a00;
+    --red: #d6455d;
+    --green: #12a06a;
+  }
+
+  body {
+    font-family: "Segoe UI", "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+    padding: 32px 24px 48px;
+    line-height: 1.6;
+  }
+
+  .doc {
+    width: 1080px; margin: 0 auto;
+    background:
+      radial-gradient(900px 400px at 8% -8%, #e9eefc 0%, rgba(233,238,252,0) 60%),
+      radial-gradient(800px 360px at 95% 0%, #f0eaff 0%, rgba(240,234,255,0) 58%),
+      #f8fafd;
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    padding: 34px 40px 36px;
+    box-shadow: 0 1px 2px rgba(15,23,42,.04), 0 24px 60px -34px rgba(15,23,42,.24);
+  }
+
+  /* header */
+  .hdr { padding-bottom: 20px; border-bottom: 1px solid var(--line); margin-bottom: 26px; }
+  .hdr h1 { font-size: 24px; font-weight: 700; letter-spacing: .3px; display: flex; align-items: center; gap: 11px; }
+  .hdr h1::before { content: ""; width: 5px; height: 25px; border-radius: 3px; background: linear-gradient(180deg, var(--purple), var(--blue)); }
+  .hdr .sub { font-size: 12.5px; color: var(--ink2); margin: 8px 0 0 16px; }
+  .meta { display: flex; gap: 22px; margin: 14px 0 0 16px; font-size: 11.5px; color: var(--ink3); flex-wrap: wrap; }
+  .meta b { color: var(--ink2); font-weight: 600; }
+
+  /* section */
+  section { margin-bottom: 30px; }
+  .sh { display: flex; align-items: center; gap: 10px; margin-bottom: 13px; }
+  .sh .no {
+    flex: 0 0 auto; width: 22px; height: 22px; border-radius: 6px;
+    background: var(--blue); color: #fff; font-size: 11.5px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .sh.p .no { background: var(--purple); }
+  .sh.a .no { background: var(--amber); }
+  .sh.r .no { background: var(--red); }
+  .sh.t .no { background: var(--teal); }
+  .sh h2 { font-size: 16.5px; font-weight: 700; letter-spacing: .2px; }
+  .sh .hint { font-size: 11.5px; color: var(--ink3); font-weight: 400; }
+
+  p { font-size: 13.2px; color: #2c3a52; }
+  p + p { margin-top: 9px; }
+  .muted { color: var(--ink2); }
+  strong { color: var(--ink); }
+
+  /* verdict cards */
+  .verdicts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .vc {
+    background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 14px 15px 15px;
+    box-shadow: 0 1px 2px rgba(15,23,42,.03), 0 8px 20px -18px rgba(15,23,42,.5);
+    border-top: 3px solid var(--blue);
+  }
+  .vc:nth-child(2) { border-top-color: var(--purple); }
+  .vc:nth-child(3) { border-top-color: var(--amber); }
+  .vc .vt { font-size: 13.5px; font-weight: 700; margin-bottom: 7px; }
+  .vc .vd { font-size: 12.2px; color: var(--ink2); line-height: 1.62; }
+  .vc .vd b { color: var(--ink); }
+
+  /* generic card */
+  .card {
+    background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px;
+    box-shadow: 0 1px 2px rgba(15,23,42,.03), 0 8px 20px -18px rgba(15,23,42,.5);
+  }
+
+  /* callout */
+  .call { border-left: 3px solid var(--amber); background: #fffaf0; border-radius: 8px; padding: 12px 16px; }
+  .call .ct { font-size: 12.5px; font-weight: 700; color: #8a5a05; margin-bottom: 5px; }
+  .call p { font-size: 12.5px; color: #6b5326; }
+
+  .call.blue { border-left-color: var(--blue); background: #f4f8ff; }
+  .call.blue .ct { color: #24408f; }
+  .call.blue p { color: #374a71; }
+
+  /* week zero */
+  .wk { display: grid; grid-template-columns: 62px 1fr; gap: 0 16px; }
+  .wk-item { display: contents; }
+  .wk-day {
+    grid-column: 1; font-size: 11.5px; font-weight: 700; color: var(--blue);
+    padding: 12px 0; position: relative;
+  }
+  .wk-day::after {
+    content: ""; position: absolute; left: 50%; top: 34px; bottom: -6px; width: 1px; background: var(--line);
+  }
+  .wk-body {
+    grid-column: 2; padding: 10px 0 10px 0; border-bottom: 1px dashed #eef2f7;
+  }
+  .wk-head { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
+  .wk-desc { font-size: 12.2px; color: var(--ink2); }
+
+  /* table */
+  table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 12.4px; }
+  thead th {
+    text-align: left; font-size: 11.5px; font-weight: 700; color: var(--ink2);
+    padding: 9px 12px; background: #f1f5f9; border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line); letter-spacing: .3px;
+  }
+  thead th:first-child { border-left: 1px solid var(--line); border-radius: 9px 0 0 0; }
+  thead th:last-child { border-right: 1px solid var(--line); border-radius: 0 9px 0 0; }
+  tbody td { padding: 10px 12px; border-bottom: 1px solid #eef2f7; vertical-align: top; color: #2c3a52; line-height: 1.55; }
+  tbody tr:last-child td { border-bottom: 1px solid var(--line); }
+  tbody td:first-child { border-left: 1px solid var(--line); font-weight: 600; color: var(--ink); }
+  tbody td:last-child { border-right: 1px solid var(--line); }
+  tbody tr:nth-child(even) td { background: #fcfdff; }
+  .tag {
+    display: inline-block; font-size: 10.5px; font-weight: 700; padding: 2px 7px; border-radius: 4px;
+    background: #eef3ff; color: var(--blue); margin-right: 5px;
+  }
+  .tag.p { background: #f3efff; color: var(--purple); }
+  .tag.t { background: #eaf9fa; color: var(--teal); }
+  .tag.a { background: #fdf6e7; color: #96600a; }
+  .tag.g { background: #eafaf2; color: var(--green); }
+
+  /* roadmap */
+  .road { display: flex; gap: 8px; margin-bottom: 16px; }
+  .ph {
+    border-radius: 10px; padding: 11px 13px; color: #fff; position: relative; overflow: hidden;
+  }
+  .ph .pn { font-size: 10.5px; font-weight: 700; opacity: .8; letter-spacing: .8px; }
+  .ph .pt { font-size: 13px; font-weight: 700; margin-top: 2px; }
+  .ph .pw { font-size: 11px; opacity: .85; margin-top: 3px; }
+  .ph1 { flex: 2; background: linear-gradient(135deg, #5285ff, #3b6ef5); }
+  .ph2 { flex: 4; background: linear-gradient(135deg, #34b7c2, #0d9aa8); }
+  .ph3 { flex: 4; background: linear-gradient(135deg, #8a6dff, #6d4aff); }
+  .ph4 { flex: 4; background: linear-gradient(135deg, #eda72b, #e08a00); }
+
+  /* two columns */
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .person { background: #fff; border: 1px solid var(--line); border-radius: 13px; overflow: hidden;
+    box-shadow: 0 1px 2px rgba(15,23,42,.03), 0 10px 24px -20px rgba(15,23,42,.5); }
+  .person .ph-hd { padding: 13px 16px; color: #fff; }
+  .pa .ph-hd { background: linear-gradient(135deg, #34b7c2, #0d9aa8); }
+  .pb .ph-hd { background: linear-gradient(135deg, #8a6dff, #6d4aff); }
+  .person .role { font-size: 11px; font-weight: 700; opacity: .85; letter-spacing: .8px; }
+  .person .nm { font-size: 14.5px; font-weight: 700; margin-top: 2px; }
+  .person .pp { padding: 13px 16px 15px; }
+  .person ul { list-style: none; display: flex; flex-direction: column; gap: 7px; }
+  .person li { font-size: 12.2px; color: #2c3a52; padding-left: 16px; position: relative; line-height: 1.5; }
+  .person li::before {
+    content: ""; position: absolute; left: 2px; top: 7px; width: 5px; height: 5px; border-radius: 50%;
+    background: var(--line2);
+  }
+  .pa li::before { background: var(--teal); }
+  .pb li::before { background: var(--purple); }
+  .person li b { color: var(--ink); }
+
+  /* handoff */
+  .handoff {
+    margin-top: 14px; background: #fff; border: 1px solid var(--line); border-radius: 13px; padding: 15px 18px;
+  }
+  .handoff .ht { font-size: 12.5px; font-weight: 700; margin-bottom: 11px; color: var(--ink2); }
+  .ho-flow { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+  .ho { font-size: 12px; font-weight: 600; padding: 7px 12px; border-radius: 7px; }
+  .ho.own-a { background: #eaf9fa; border: 1px solid #cdedf0; color: #0a7381; }
+  .ho.own-b { background: #f3efff; border: 1px solid #e0d7ff; color: #4c2fd0; }
+  .ho.contract { background: #fff; border: 1px dashed var(--line2); color: var(--ink2); font-weight: 500; }
+  .ho-ar { color: #b9c5d4; font-weight: 700; font-size: 13px; }
+  .ho-note { font-size: 11.5px; color: var(--ink3); margin-top: 10px; }
+  .ho-note b { color: var(--red); }
+
+  /* rules */
+  .rules { display: grid; grid-template-columns: 1fr 1fr; gap: 11px; }
+  .rule { display: flex; gap: 10px; background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+  .rule .ri { flex: 0 0 auto; width: 20px; height: 20px; border-radius: 50%; background: #eef3ff; color: var(--blue);
+    font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+  .rule .rt { font-size: 12.4px; }
+  .rule .rt b { display: block; font-size: 12.6px; margin-bottom: 2px; }
+  .rule .rt span { color: var(--ink2); }
+
+  /* not-do */
+  .nodo { background: #fff; border: 1px solid #f3dfe3; border-radius: 12px; padding: 15px 18px; }
+  .nodo .nt { font-size: 12.8px; font-weight: 700; color: #a52c40; margin-bottom: 10px; }
+  .nodo .nlist { display: grid; grid-template-columns: 1fr 1fr; gap: 7px 20px; }
+  .nodo .ni { font-size: 12.2px; color: #6b4a51; padding-left: 15px; position: relative; }
+  .nodo .ni::before { content: "\00d7"; position: absolute; left: 2px; top: -1px; color: #d69aa5; font-weight: 700; }
+  .nodo .ni b { color: #4a2c33; }
+
+  /* risk */
+  .risk-row { display: flex; gap: 10px; align-items: flex-start; padding: 11px 0; border-bottom: 1px dashed #eef2f7; }
+  .risk-row:last-child { border-bottom: 0; }
+  .risk-lv { flex: 0 0 auto; font-size: 10.5px; font-weight: 700; padding: 3px 8px; border-radius: 4px; background: #fdeaf0; color: #b02a44; }
+  .risk-lv.m { background: #fff5e0; color: #96600a; }
+  .risk-b { font-size: 12.4px; }
+  .risk-b b { display: block; margin-bottom: 2px; }
+  .risk-b span { color: var(--ink2); }
+
+  /* checklist */
+  .todo { display: flex; flex-direction: column; gap: 8px; }
+  .todo .ti { display: flex; gap: 10px; align-items: flex-start; background: #fff; border: 1px solid var(--line);
+    border-radius: 9px; padding: 10px 13px; font-size: 12.5px; }
+  .todo .tn { flex: 0 0 auto; width: 19px; height: 19px; border-radius: 5px; background: #eafaf2; color: var(--green);
+    font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+  .todo .ti b { color: var(--ink); }
+  .todo .ti span { color: var(--ink3); }
+
+  /* footer */
+  .foot { margin-top: 28px; padding-top: 15px; border-top: 1px solid var(--line); font-size: 11.5px; color: var(--ink3);
+    display: flex; justify-content: space-between; gap: 20px; }
+</style>
+</head>
+<body>
+<div class="doc">
+
+  <div class="hdr">
+    <h1>仓储智能管理 Agent 系统 · 启动方案与分工</h1>
+    <div class="sub">两人团队 · 从零到可试点版本 · 14 周</div>
+    <div class="meta">
+      <span><b>假设前提</b>：2 人全职 · 单一仓库 · 无现成系统需替换 · 无复杂自动化设备</span>
+      <span><b>目标</b>：14 周内交付可真实跑单的试点版本</span>
+    </div>
+  </div>
+
+  <!-- 1 三条判断 -->
+  <section>
+    <div class="sh"><div class="no">1</div><h2>先给三条判断</h2><span class="hint">这部分比后面的计划更重要</span></div>
+    <div class="verdicts">
+      <div class="vc">
+        <div class="vt">不要从零写完整 WMS</div>
+        <div class="vd">两个人写不完一个商用 WMS。真正要做的是<b>一条能跑通的最小闭环</b>，够支撑 AI 场景即可。单据类型先只做 5 张，不要 30 张。</div>
+      </div>
+      <div class="vc">
+        <div class="vt">不要先做 AI</div>
+        <div class="vd">先把<b>库存账做对</b>。账是错的，AI 只会把错误放大。<b>AI 是放大器，不是地基。</b>所以 AI 排在第 7 周之后。</div>
+      </div>
+      <div class="vc">
+        <div class="vt">不要按想象的流程开发</div>
+        <div class="vd">第一周必须<b>去仓库现场站着看</b>。仓库作业有大量"系统里没有的规矩"，坐在办公室设计出来的流程上线必被推翻。</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2 冷启动 -->
+  <section>
+    <div class="sh p"><div class="no">2</div><h2>冷启动：前两周不要写业务代码</h2><span class="hint">这两周决定项目生死</span></div>
+
+    <div class="wk">
+      <div class="wk-day">W1 一</div>
+      <div class="wk-body">
+        <div class="wk-head">去现场，不要开会</div>
+        <div class="wk-desc">两人一起去仓库待一整天。跟着一个真实订单从收货走到发运，全程录像、记时间、记纸质单据。重点记三件事：<b>他们在哪里停下来找东西</b>、<b>哪里用纸质/微信代替系统</b>、<b>哪里在重复录入</b>。这三个位置就是产品的价值点。</div>
+      </div>
+
+      <div class="wk-day">W1 三</div>
+      <div class="wk-body">
+        <div class="wk-head">写一页纸范围声明</div>
+        <div class="wk-desc">半页写"做什么"，<b>半页写"不做什么"</b>。不做什么那一页是护身符，后面所有人加需求时拿它挡。明确列出：本期不做多货主、不做波次优化、不做设备对接、不做移动 App（用 H5）。</div>
+      </div>
+
+      <div class="wk-day">W1 五</div>
+      <div class="wk-body">
+        <div class="wk-head">定 3 个核心痛点 + 3 个指标</div>
+        <div class="wk-desc">痛点必须可量化。例如"找货平均 8 分钟"→ 目标 3 分钟；"账实差异每月 3%"→ 目标 0.5%;"补货靠拍脑袋"→ 缺货率从 6% 降到 2%。没有指标的痛点等于没有痛点。</div>
+      </div>
+
+      <div class="wk-day">W2 一~三</div>
+      <div class="wk-body">
+        <div class="wk-head">画领域模型（只画 8 张表）</div>
+        <div class="wk-desc">商品 SKU、库位 Location、库存 Inventory、库存流水 StockTxn、入库单、出库单、单据明细、用户。就这 8 张。<b>两人一起画，一起评审</b>——这是全项目最重要的协作动作，模型错了后面全是返工。</div>
+      </div>
+
+      <div class="wk-day">W2 四~五</div>
+      <div class="wk-body">
+        <div class="wk-head">冻结 API 契约 + 搭骨架</div>
+        <div class="wk-desc">用 OpenAPI 写接口定义，<b>先生成文档和前端 client，再写实现</b>。同时把 Docker Compose 跑起来（PG + Redis + MinIO），前端空壳能登录，CI 能跑通。<b>验收标准：两人各自在干净机器上 30 分钟内跑起完整环境。</b></div>
+      </div>
+    </div>
+
+    <div class="call blue" style="margin-top:14px">
+      <div class="ct">为什么第 2 周末要"冻结契约"</div>
+      <p>两人团队最大的成本不是写代码，是<b>互相等待和反复对齐</b>。契约一旦冻结，两个人就能真正并行：一个人埋头写后端实现，另一个人对着 mock 数据做前端和 Agent，中间不需要天天沟通。契约后续可以加字段，但不要改已有字段的语义。</p>
+    </div>
+  </section>
+
+  <!-- 3 技术栈 -->
+  <section>
+    <div class="sh t"><div class="no">3</div><h2>技术栈定稿</h2><span class="hint">原则：组件少、运维轻、AI 同语言</span></div>
+    <table>
+      <thead>
+        <tr><th style="width:110px">层</th><th style="width:250px">选型</th><th>理由</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>后端</td><td>Python 3.12 + FastAPI</td><td>与 AI 层同语言，省掉一个服务边界和一套序列化协议；两人团队最忌讳多语言</td></tr>
+        <tr><td>前端</td><td>Vue3 + TypeScript + Element Plus</td><td>表格/表单类后台生态最成熟；同一套响应式页面直接当 PDA 用，不做原生 App</td></tr>
+        <tr><td>数据库</td><td>PostgreSQL 16 + pgvector</td><td>关系数据和向量检索一个库搞定，少运维一个 Milvus；事务能力是库存账的刚需</td></tr>
+        <tr><td>缓存 / 队列</td><td>Redis</td><td>库存热点缓存 + 异步任务（盘点、预测跑批）</td></tr>
+        <tr><td>对象存储</td><td>MinIO</td><td>单据影像、验收照片、文档原件</td></tr>
+        <tr><td>Agent 编排</td><td>自研轻量状态机优先，LangGraph 备选</td><td>两人团队扛不住框架 breaking change；仓储场景的编排复杂度被高估了</td></tr>
+        <tr><td>模型</td><td>统一网关 + 可切换（DeepSeek / 通义 / GLM）</td><td>成本可控，不被单一供应商绑定，出问题能一键切</td></tr>
+        <tr><td>部署</td><td>Docker Compose，<b>不上 K8s</b></td><td>单仓场景一台机器足够；K8s 的收益要 10 人团队才追得回成本</td></tr>
+      </tbody>
+    </table>
+    <p class="muted" style="margin-top:11px;font-size:12.3px">如果你的团队是 Java 背景，把后端换成 Spring Boot、前端不变即可，其余选型都成立。但<b>不要为了 AI 再引入一个 Python 服务</b>——两人团队维护两套语言是纯亏损。</p>
+  </section>
+
+  <!-- 4 路线图 -->
+  <section>
+    <div class="sh p"><div class="no">4</div><h2>14 周路线图</h2><span class="hint">每阶段有明确验收标准，不达标不进下一阶段</span></div>
+
+    <div class="road">
+      <div class="ph ph1"><div class="pn">PHASE 0</div><div class="pt">定基线</div><div class="pw">W1–W2</div></div>
+      <div class="ph ph2"><div class="pn">PHASE 1</div><div class="pt">最小业务闭环</div><div class="pw">W3–W6</div></div>
+      <div class="ph ph3"><div class="pn">PHASE 2</div><div class="pt">AI 场景落地</div><div class="pw">W7–W10</div></div>
+      <div class="ph ph4"><div class="pn">PHASE 3</div><div class="pt">加固与扩展</div><div class="pw">W11–W14</div></div>
+    </div>
+
+    <table>
+      <thead>
+        <tr><th style="width:150px">阶段</th><th style="width:250px">交付物</th><th>验收标准（硬指标）</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="tag">P0</span>定基线<br><span style="font-weight:400;color:#8a97a8;font-size:11.5px">W1–W2</span></td>
+          <td>现场调研笔记 · 流程现状图 · 一页纸范围声明 · 领域模型 ER 图 · OpenAPI v0.1 · 可运行骨架 + CI</td>
+          <td>两人能各自在干净环境 30 分钟内跑起全套；契约评审通过；范围声明双方确认</td>
+        </tr>
+        <tr>
+          <td><span class="tag t">P1</span>最小闭环<br><span style="font-weight:400;color:#8a97a8;font-size:11.5px">W3–W6</span></td>
+          <td>收货 → 上架 → 库存查询 → 拣货 → 出库全链路；库存账本（可用/锁定/在途）；扫码作业；基础 RBAC</td>
+          <td>用<b>真实 SKU 数据跑 20 单</b>，账实一致率 100%；并发扣减不超卖；异常单据可回滚</td>
+        </tr>
+        <tr>
+          <td><span class="tag p">P2</span>AI 落地<br><span style="font-weight:400;color:#8a97a8;font-size:11.5px">W7–W10</span></td>
+          <td>场景 A：自然语言查库存（<b>只读</b>）<br>场景 B：智能补货建议 → 人审批 → 生成采购/调拨单<br>编排器 + 2 个 Agent + MCP 工具 + 决策引擎 + 审批台 + 审计日志</td>
+          <td>30 条真实问题集上 NL 查询准确率 ≥90%；补货建议采纳率 ≥60%；<b>零未经审批的写操作（审计可证）</b></td>
+        </tr>
+        <tr>
+          <td><span class="tag a">P3</span>加固扩展<br><span style="font-weight:400;color:#8a97a8;font-size:11.5px">W11–W14</span></td>
+          <td>盘点、库位分配策略、报表看板、PDA 体验优化、幂等与断网续传、性能压测、部署手册</td>
+          <td>核心接口 P95 &lt; 300ms；重复扫码/断网重连不产生脏数据；新环境 1 小时内可部署完成</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="call" style="margin-top:14px">
+      <div class="ct">为什么 AI 场景只做两个</div>
+      <p>两个场景刚好覆盖两种形态：<b>只读查询</b>（证明可用性和价值）和<b>写操作 + 人工审批</b>（验证治理链路能扛住）。这两条跑通，后面加第 3、4 个 Agent 只是复制工作量；这两条跑不通，做 6 个 Agent 也上不了生产。</p>
+    </div>
+  </section>
+
+  <!-- 5 分工 -->
+  <section>
+    <div class="sh t"><div class="no">5</div><h2>两人分工</h2><span class="hint">按模块切，不按前后端切</span></div>
+
+    <div class="two">
+      <div class="person pa">
+        <div class="ph-hd">
+          <div class="role">成员 A · OWNER</div>
+          <div class="nm">领域与账务</div>
+        </div>
+        <div class="pp">
+          <ul>
+            <li><b>库存账本与流水</b> —— 全项目最难、最核心，必须一个人从头负责到底</li>
+            <li><b>单据状态机</b> —— 收货、上架、拣货、出库、盘点的状态流转与回滚</li>
+            <li><b>库位模型与分配算法</b> —— 库区/货架/库位，上架推荐规则</li>
+            <li><b>事务、并发与幂等</b> —— 防超卖、防重复提交、防断网重复扫码</li>
+            <li><b>MCP 工具实现</b> —— 工具本质就是业务写入口，必须懂业务的人写</li>
+            <li><b>数据初始化与迁移脚本</b> —— 真实 SKU 导入、期初库存</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="person pb">
+        <div class="ph-hd">
+          <div class="role">成员 B · OWNER</div>
+          <div class="nm">交互与智能</div>
+        </div>
+        <div class="pp">
+          <ul>
+            <li><b>前端工作台 + PDA 页面</b> —— 列表、单据、扫码交互，一套代码两种屏幕</li>
+            <li><b>Agent 编排器与 Prompt 工程</b> —— 意图识别、工具选择、多轮澄清</li>
+            <li><b>决策引擎与审批流</b> —— 规则校验、风险分级、审批台 UI</li>
+            <li><b>RAG 知识库</b> —— SOP 文档切分、检索、引用溯源</li>
+            <li><b>报表与看板</b> —— 库存健康度、作业效率、AI 采纳率</li>
+            <li><b>AI 评测集</b> —— 30 条真实问题 + 标准答案，这是唯一能证明 AI 有效的证据</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="handoff">
+      <div class="ht">两人之间的三个交接面（只有这三个，其余不互相打扰）</div>
+      <div class="ho-flow">
+        <span class="ho own-a">A：业务能力实现</span>
+        <span class="ho-ar">&rarr;</span>
+        <span class="ho contract">contracts/openapi.yaml</span>
+        <span class="ho-ar">&rarr;</span>
+        <span class="ho own-b">B：前端调用</span>
+      </div>
+      <div class="ho-flow" style="margin-top:8px">
+        <span class="ho own-a">A：MCP 工具（强类型入参）</span>
+        <span class="ho-ar">&rarr;</span>
+        <span class="ho contract">contracts/mcp-tools.json</span>
+        <span class="ho-ar">&rarr;</span>
+        <span class="ho own-b">B：Agent 调用</span>
+      </div>
+      <div class="ho-flow" style="margin-top:8px">
+        <span class="ho own-a">A：账本口径定义</span>
+        <span class="ho-ar">&harr;</span>
+        <span class="ho contract">口径文档（可用/锁定/在途怎么算）</span>
+        <span class="ho-ar">&harr;</span>
+        <span class="ho own-b">B：报表展示</span>
+      </div>
+      <div class="ho-note"><b>铁律：B 不允许直接读 A 的数据库表。</b>所有数据必须走接口或 MCP 工具。这条规则不守，两个人一周内就会互相踩死对方的表结构，返工成本远大于写接口的成本。</div>
+    </div>
+
+    <div class="call" style="margin-top:14px">
+      <div class="ct">如果两人技能不对等，怎么调</div>
+      <p>谁更懂仓储业务，谁就必须做 A（账不是靠技术能力做对的，是靠业务理解）。如果两人都不懂业务，那第 1 周现场调研必须加倍投入，并且要拉一个仓库主管做"业务顾问"，每周 2 小时固定答疑——这个角色比多一个程序员有用得多。如果前端能力弱，B 的前端部分可直接用 Element Plus 的 admin 模板起步，不要原创设计。</p>
+    </div>
+  </section>
+
+  <!-- 6 协作机制 -->
+  <section>
+    <div class="sh"><div class="no">6</div><h2>协作机制</h2><span class="hint">两人团队靠节奏，不靠流程</span></div>
+    <div class="rules">
+      <div class="rule"><div class="ri">1</div><div class="rt"><b>周一 30 分钟对齐</b><span>只定本周切片和接口变更，不做汇报</span></div></div>
+      <div class="rule"><div class="ri">2</div><div class="rt"><b>周三半天联调</b><span>固定时间，前后端实际对接，问题当场解决</span></div></div>
+      <div class="rule"><div class="ri">3</div><div class="rt"><b>周五 Demo</b><span>只演示能跑的东西，不接受 PPT 和截图</span></div></div>
+      <div class="rule"><div class="ri">4</div><div class="rt"><b>PR 强制互审</b><span>两人团队唯一的代码质量关卡，不能省</span></div></div>
+      <div class="rule"><div class="ri">5</div><div class="rt"><b>主干开发 + 短分支</b><span>单分支存活不超过 2 天，减少合并地狱</span></div></div>
+      <div class="rule"><div class="ri">6</div><div class="rt"><b>接口变更当日通知</b><span>改契约必须同步改文档并告知对方</span></div></div>
+    </div>
+  </section>
+
+  <!-- 7 不要做 -->
+  <section>
+    <div class="sh r"><div class="no">7</div><h2>明确不做的事</h2><span class="hint">这份清单比路线图更能保护你</span></div>
+    <div class="nodo">
+      <div class="nt">前 14 周内，以下内容一律不做</div>
+      <div class="nlist">
+        <div class="ni"><b>多仓多货主</b> —— 单仓跑通再说</div>
+        <div class="ni"><b>复杂波次策略</b> —— 先一单一拣</div>
+        <div class="ni"><b>AGV / 输送线对接</b> —— 等有设备再谈</div>
+        <div class="ni"><b>微服务拆分</b> —— 单体 + 模块化足够</div>
+        <div class="ni"><b>自研权限系统</b> —— 用现成 RBAC 库</div>
+        <div class="ni"><b>模型微调</b> —— Prompt + 工具调用先做扎实</div>
+        <div class="ni"><b>原生 App</b> —— H5 响应式就够用</div>
+        <div class="ni"><b>6 个 Agent</b> —— 先 2 个，跑通再加</div>
+        <div class="ni"><b>自研报表引擎</b> —— 用现成 BI 或直接 SQL</div>
+        <div class="ni"><b>K8s / 服务网格</b> —— Compose 到试点结束</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 8 风险 -->
+  <section>
+    <div class="sh a"><div class="no">8</div><h2>四个真实会杀死项目的风险</h2></div>
+    <div class="card">
+      <div class="risk-row">
+        <span class="risk-lv">极高</span>
+        <div class="risk-b"><b>范围失控</b><span>两人团队最常见的死法：每来一个新需求就加。对策：一页纸范围声明 + "换出机制"（要加新功能，必须先说砍掉哪个）。</span></div>
+      </div>
+      <div class="risk-row">
+        <span class="risk-lv">极高</span>
+        <div class="risk-b"><b>库存账实不一致</b><span>库存被多处直接 UPDATE，最终没人知道真实数量。对策：<b>库存只能有一个写入入口</b>，所有变动必落流水，禁止任何地方直接改库存表。</span></div>
+      </div>
+      <div class="risk-row">
+        <span class="risk-lv m">高</span>
+        <div class="risk-b"><b>AI 幻觉导致错误操作</b><span>Agent 自信地生成一张错误单据。对策：只读优先；写操作必须过决策引擎 + 人工审批；所有动作幂等且可撤销；审计日志完整可回放。</span></div>
+      </div>
+      <div class="risk-row">
+        <span class="risk-lv m">高</span>
+        <div class="risk-b"><b>两人都变成"全栈打杂"</b><span>没有明确边界，谁有空谁改，三个月后代码没人说得清。对策：模块 Owner 制 + 契约隔离 + 不直读对方数据表。</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 9 今天就能做 -->
+  <section style="margin-bottom:6px">
+    <div class="sh t"><div class="no">9</div><h2>今天下午就能开始做的五件事</h2></div>
+    <div class="todo">
+      <div class="ti"><div class="tn">1</div><div><b>各写 3 条最痛的作业场景</b> <span>—— 写"痛点"不写"功能"。两条清单取交集，交集就是 MVP。</span></div></div>
+      <div class="ti"><div class="tn">2</div><div><b>约一次仓库现场</b> <span>—— 本周内必须去，待满一天，跟着走完一单。</span></div></div>
+      <div class="ti"><div class="tn">3</div><div><b>建 Git 仓库 + Docker Compose 骨架</b> <span>—— 起 PG/Redis/MinIO，能连上就行，先不写业务。</span></div></div>
+      <div class="ti"><div class="tn">4</div><div><b>白板画 8 张表的 ER 图</b> <span>—— 不写代码，只用方框和箭头，两小时后拍照存档。</span></div></div>
+      <div class="ti"><div class="tn">5</div><div><b>准备 30 条真实问题</b> <span>—— 比如"三号库还有多少箱 A 货""哪些货快过期了"，这是 Phase 2 的评测基线，现在就准备。</span></div></div>
+    </div>
+  </section>
+
+  <div class="foot">
+    <span>仓储智能管理 Agent 系统 · 启动方案 · 配套架构图见 01-architecture.html</span>
+    <span>周期与人力为估算值，需结合现场调研结果校准</span>
+  </div>
+
+</div>
+</body>
+</html>

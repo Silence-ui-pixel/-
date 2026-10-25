@@ -1,0 +1,69 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "canku-api"
+version = "0.1.0"
+description = "仓储智能管理 Agent 系统 · API 服务"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi>=0.115",
+  "uvicorn[standard]>=0.32",
+  "pydantic>=2.9",
+  "pydantic-settings>=2.6",
+  # 2.0 的 async 支持是 apply_txn 行锁/事务控制的前提
+  "sqlalchemy[asyncio]>=2.0.36",
+  "asyncpg>=0.30",
+  # 数据库迁移：DDL 版本化，schema.sql 只作为基线快照不再直接执行
+  "alembic>=1.13",
+  # alembic 走同步引擎，需要同步驱动；业务层用 asyncpg，两者并存
+  "psycopg[binary]>=3.2",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.3",
+  "pytest-asyncio>=0.24",
+  "httpx>=0.27",
+  "ruff>=0.7",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
+
+# ---------------------------------------------------------------
+# ruff：只开必要规则。P0 阶段目标是「能跑 + 一致」，
+# 不是「通过所有风格检查」。规则太多两人会被 lint 缠住。
+# ---------------------------------------------------------------
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+exclude = ["alembic/versions"]
+
+[tool.ruff.lint]
+select = [
+  "E",   # pycodestyle
+  "F",   # pyflakes
+  "I",   # import 排序
+  "UP",  # pyupgrade
+  "B",   # bugbear
+]
+
+# FastAPI 的依赖注入本来就是「在默认值里调用函数」，B008 在这里是误报。
+# 按官方建议把 Depends 一类标记为不可变调用，而不是整条规则关掉。
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = [
+  "fastapi.Depends",
+  "fastapi.Query",
+  "fastapi.Path",
+  "fastapi.Body",
+  "fastapi.Header",
+  "fastapi.Form",
+  "fastapi.File",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+addopts = "-q"

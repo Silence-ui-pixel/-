@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>A 成员工作台 · 领域与账务 Owner</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f4f6fa; --ink: #0f172a; --ink2: #56657c; --ink3: #8a97a8;
+    --line: #e3e9f0; --blue: #3b6ef5; --purple: #6d4aff; --teal: #0d9aa8;
+    --amber: #e08a00; --red: #d6455d; --green: #12a06a; --slate: #5c6b80;
+  }
+
+  body {
+    font-family: "Segoe UI", "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+    background: var(--bg); color: var(--ink); -webkit-font-smoothing: antialiased;
+    line-height: 1.6; padding: 32px 24px 48px;
+  }
+
+  .doc {
+    width: 1120px; margin: 0 auto;
+    background:
+      radial-gradient(900px 400px at 5% -8%, #e6f6f7 0%, rgba(230,246,247,0) 58%),
+      radial-gradient(820px 380px at 97% 0%, #eef1fc 0%, rgba(238,241,252,0) 56%),
+      #f8fafd;
+    border: 1px solid var(--line); border-radius: 20px; padding: 34px 40px 36px;
+    box-shadow: 0 1px 2px rgba(15,23,42,.04), 0 24px 60px -34px rgba(15,23,42,.24);
+  }
+
+  .hdr { padding-bottom: 20px; border-bottom: 1px solid var(--line); margin-bottom: 26px; }
+  .hdr h1 { font-size: 24px; font-weight: 700; letter-spacing: .3px; display: flex; align-items: center; gap: 11px; }
+  .hdr h1::before { content: ""; width: 5px; height: 25px; border-radius: 3px; background: linear-gradient(180deg, var(--teal), var(--blue)); }
+  .hdr .sub { font-size: 12.5px; color: var(--ink2); margin: 8px 0 0 16px; }
+  .badges { display: flex; gap: 8px; margin: 13px 0 0 16px; flex-wrap: wrap; }
+  .badges span { font-size: 11px; padding: 4px 10px; border-radius: 999px; background: #fff; border: 1px solid var(--line); color: var(--ink2); }
+  .badges span b { color: var(--teal); }
+  .badges span.b2 b { color: var(--amber); }
+  .badges span.b3 b { color: var(--green); }
+
+  section { margin-bottom: 30px; }
+  .sh { display: flex; align-items: center; gap: 10px; margin-bottom: 13px; }
+  .sh .no { flex: 0 0 auto; width: 22px; height: 22px; border-radius: 6px; background: var(--teal); color: #fff;
+    font-size: 11.5px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+  .sh.a .no { background: var(--amber); }
+  .sh.r .no { background: var(--red); }
+  .sh.g .no { background: var(--green); }
+  .sh h2 { font-size: 16.5px; font-weight: 700; }
+  .sh .hint { font-size: 11.5px; color: var(--ink3); }
+
+  p { font-size: 13.2px; color: #2c3a52; }
+  p + p { margin-top: 9px; }
+  code { font-family: Consolas, "Courier New", monospace; font-size: 11.6px;
+    background: #eef3fb; padding: 1px 5px; border-radius: 4px; color: #1d4ed8; }
+
+  /* verdict cards */
+  .verdict { display: grid; grid-template-columns: repeat(4, 1fr); gap: 11px; }
+  .vc { background: #fff; border: 1px solid var(--line); border-radius: 11px; padding: 13px 14px;
+    border-top: 3px solid var(--teal); box-shadow: 0 1px 2px rgba(15,23,42,.03); }
+  .vc:nth-child(2) { border-top-color: var(--amber); }
+  .vc:nth-child(3) { border-top-color: var(--blue); }
+  .vc:nth-child(4) { border-top-color: var(--purple); }
+  .vc .vt { font-size: 12.6px; font-weight: 700; margin-bottom: 5px; }
+  .vc .vd { font-size: 11.7px; color: var(--ink2); line-height: 1.55; }
+  .vc .vd b { color: var(--ink); }
+
+  /* zone blocks */
+  .zone { background: #fff; border: 1px solid var(--line); border-radius: 13px; overflow: hidden;
+    box-shadow: 0 1px 2px rgba(15,23,42,.03), 0 10px 26px -24px rgba(15,23,42,.4); margin-bottom: 13px; }
+  .zone-hd { display: flex; align-items: center; gap: 9px; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+  .zone-hd .tag { font-size: 10.5px; font-weight: 700; color: #fff; padding: 2px 8px; border-radius: 5px; background: var(--green); letter-spacing: .4px; }
+  .zone-hd .t2 { background: var(--amber); }
+  .zone-hd .t3 { background: var(--slate); }
+  .zone-hd .zt { font-size: 13.5px; font-weight: 700; }
+  .zone-hd .zm { margin-left: auto; font-size: 11.3px; color: var(--ink3); }
+
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; font-size: 10.6px; font-weight: 700; color: var(--ink3); letter-spacing: .5px;
+    padding: 8px 12px; background: #f7f9fc; border-bottom: 1px solid var(--line); text-transform: uppercase; }
+  td { font-size: 12.1px; padding: 9px 12px; border-bottom: 1px solid #eef2f7; color: #2c3a52; vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  td.id { font-family: Consolas, monospace; font-weight: 700; color: var(--teal); white-space: nowrap; font-size: 11.5px; }
+  td.nm { font-weight: 600; color: var(--ink); }
+  td .pd { font-family: Consolas, monospace; font-size: 11px; color: var(--ink2); }
+  .now { display: inline-block; font-size: 10.4px; font-weight: 700; padding: 2px 7px; border-radius: 4px;
+    background: #e6f7ef; color: #0b7a52; white-space: nowrap; }
+  .soon { display: inline-block; font-size: 10.4px; font-weight: 700; padding: 2px 7px; border-radius: 4px;
+    background: #fdf3e0; color: #a06400; white-space: nowrap; }
+  .wait { display: inline-block; font-size: 10.4px; font-weight: 700; padding: 2px 7px; border-radius: 4px;
+    background: #eef1f5; color: #4e5d72; white-space: nowrap; }
+
+  /* timeline */
+  .tl { background: #fff; border: 1px solid var(--line); border-radius: 13px; padding: 12px 14px 14px;
+    box-shadow: 0 1px 2px rgba(15,23,42,.03), 0 10px 26px -24px rgba(15,23,42,.4); }
+  .tl-row { display: grid; grid-template-columns: 46px 1fr 1fr; gap: 10px; padding: 7px 0;
+    border-bottom: 1px dashed #edf1f6; align-items: center; }
+  .tl-row:last-child { border-bottom: none; }
+  .tl-row.hd { border-bottom: 1px solid var(--line); padding-bottom: 6px; }
+  .tl-row.hd div { font-size: 10.6px; font-weight: 700; color: var(--ink3); letter-spacing: .5px; text-transform: uppercase; }
+  .tl-d { font-size: 11.5px; font-weight: 700; color: var(--ink); font-family: Consolas, monospace; }
+  .tl-c { font-size: 11.7px; padding: 3px 8px; border-radius: 5px; line-height: 1.45; }
+  .tl-c.shared { background: #fdf3e0; color: #8a5800; border-left: 2px solid var(--amber); }
+  .tl-c.solo { background: #e9f8f9; color: #07606a; border-left: 2px solid var(--teal); }
+  .tl-c.free { background: #f4f6f9; color: #6b7a8d; border-left: 2px solid #c9d3df; }
+
+  /* deliverable */
+  .dl { display: grid; grid-template-columns: repeat(2, 1fr); gap: 11px; }
+  .dc { background: #fff; border: 1px solid var(--line); border-radius: 11px; padding: 12px 14px;
+    border-left: 3px solid var(--blue); box-shadow: 0 1px 2px rgba(15,23,42,.03); }
+  .dc .dt { font-size: 12.5px; font-weight: 700; display: flex; align-items: baseline; gap: 7px; }
+  .dc .dt span { font-size: 10.5px; color: #fff; background: var(--blue); padding: 1px 6px; border-radius: 4px; font-weight: 700; }
+  .dc .dp { font-family: Consolas, monospace; font-size: 10.9px; color: #1d4ed8; background: #eef3fb;
+    padding: 4px 7px; border-radius: 4px; margin: 7px 0; word-break: break-all; }
+  .dc .dd { font-size: 11.6px; color: var(--ink2); line-height: 1.55; }
+
+  /* red lines */
+  .rl { display: grid; gap: 9px; }
+  .ri { display: flex; gap: 10px; background: #fff; border: 1px solid var(--line);
+    border-left: 3px solid var(--red); border-radius: 9px; padding: 10px 13px; }
+  .ri .rn { flex: 0 0 auto; font-size: 11px; font-weight: 700; color: var(--red); font-family: Consolas, monospace; padding-top: 1px; }
+  .ri .rt { font-size: 12.3px; }
+  .ri .rt b { color: var(--ink); }
+  .ri .rt em { font-style: normal; color: var(--red); font-weight: 600; }
+
+  /* todolist */
+  .todo { background: #fff; border: 1px solid var(--line); border-radius: 13px; overflow: hidden;
+    box-shadow: 0 1px 2px rgba(15,23,42,.03), 0 10px 26px -24px rgba(15,23,42,.4); }
+  .ti { display: grid; grid-template-columns: 74px 1fr; gap: 12px; padding: 11px 14px; border-bottom: 1px solid #eef2f7; align-items: start; }
+  .ti:last-child { border-bottom: none; }
+  .ti .tt { font-family: Consolas, monospace; font-size: 11.2px; font-weight: 700; color: var(--green);
+    background: #e6f7ef; border-radius: 5px; padding: 2px 6px; text-align: center; }
+  .ti .tb { font-size: 12.4px; }
+  .ti .tb b { color: var(--ink); }
+  .ti .tb .why { display: block; font-size: 11.4px; color: var(--ink3); margin-top: 3px; line-height: 1.5; }
+
+  .note { background: linear-gradient(180deg, #f0f9fa, #fff); border: 1px solid #cfe9ec;
+    border-radius: 11px; padding: 13px 15px; }
+  .note .nt { font-size: 12.4px; font-weight: 700; color: #07606a; margin-bottom: 6px; }
+  .note p { font-size: 12.2px; color: #2c4a4d; }
+
+  .foot { margin-top: 30px; padding-top: 16px; border-top: 1px solid var(--line);
+    font-size: 11.3px; color: var(--ink3); display: flex; justify-content: space-between; }
+</style>
+</head>
+<body>
+<div class="doc">
+
+  <div class="hdr">
+    <h1>A 成员工作台 · 领域与账务 Owner</h1>
+    <div class="sub">Sprint 1（D1–D10）· 独立任务 5.0 人天 + 共同任务分摊 2.75 人天 = 7.75 人天</div>
+    <div class="badges">
+      <span>独占可独立开工 <b>5 项</b></span>
+      <span class="b2">必须与 B 同时在场 <b>6 项</b></span>
+      <span class="b3">硬阻塞（B 不给就没法做）<b>0 项</b></span>
+    </div>
+  </div>
+
+  <!-- 1 结论 -->
+  <section>
+    <div class="sh"><div class="no">1</div><h2>先看结论：你的处境比想象中好，但责任比想象中重</h2>
+      <span class="hint">这四条决定你这个 Sprint 怎么过</span></div>
+    <div class="verdict">
+      <div class="vc">
+        <div class="vt">你没有真正的等待项</div>
+        <div class="vd">5 个独占任务里，只有 S1-06 依赖你自己的 S1-05。没有任何一个任务在等 B 交付东西给你。<b>你不存在"坐着等"的状态。</b></div>
+      </div>
+      <div class="vc">
+        <div class="vt">你是整条链的瓶颈</div>
+        <div class="vd">B 的 S1-10 等你的骨架、S1-11 和 S1-12 等你的契约。<b>你慢一天，B 就空一天。</b>两人团队最贵的成本是不产生交付物的等待。</div>
+      </div>
+      <div class="vc">
+        <div class="vt">今天就能开三件事</div>
+        <div class="vd">骨架、接口清单草稿、apply_txn 测试用例设计——<b>都不依赖 D1 调研，也不依赖 B。</b>不用等到 Sprint 正式开始。</div>
+      </div>
+      <div class="vc">
+        <div class="vt">契约提前 2 天有复利</div>
+        <div class="vd">骨架拆成碎片提前做，契约就能从 D6–D7 提到 <b>D4–D5</b>，B 的 client 和 mock 全部前移。<b>这是本 Sprint 最高杠杆的一个动作。</b></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2 三类分区 -->
+  <section>
+    <div class="sh"><div class="no">2</div><h2>任务三分区：现在能做 / 必须一起 / 需要 B 的信息</h2>
+      <span class="hint">按「能不能独自推进」重新归类，而不是按人天排</span></div>
+
+    <div class="zone">
+      <div class="zone-hd"><span class="tag">A 区</span><span class="zt">立即可独立开始 · 不需要等任何人</span>
+        <span class="zm">5 项 · 5.0 人天</span></div>
+      <table>
+        <thead><tr><th style="width:64px">编号</th><th style="width:190px">任务</th><th style="width:70px">人天</th>
+          <th style="width:86px">可以开始</th><th>为什么能独立做 / 第一个动作</th></tr></thead>
+        <tbody>
+          <tr>
+            <td class="id">S1-05</td><td class="nm">仓库骨架 + docker-compose + CI</td><td class="pd">1.0</td>
+            <td><span class="now">今天</span></td>
+            <td>零依赖。第一个动作：<code>git init</code> + 建目录骨架 + <code>docker-compose.yml</code>（pg16 + api + web 三个服务，web 只占位不实现）。这是 B 的 S1-10 的前置，越早越好。</td>
+          </tr>
+          <tr>
+            <td class="id">S1-07</td><td class="nm">接口清单梳理（不实现）</td><td class="pd">0.5</td>
+            <td><span class="now">今天</span></td>
+            <td>模型已经冻结在 <code>db/schema.sql</code> 里了，接口清单本质是「从 8 张表反推资源 + 动作」。不需要等 D3 的评审会，<b>草稿正好当评审输入</b>。第一个动作：把 8 张表列成资源，每个资源写 CRUD + 领域动作。</td>
+          </tr>
+          <tr>
+            <td class="id">S1-15a</td><td class="nm">apply_txn 测试用例设计（只写用例，不写实现）</td><td class="pd">0.5</td>
+            <td><span class="now">今天</span></td>
+            <td>纯设计文档。四种场景（正常 / 库存不足 / 并发扣减 / 重复提交）的输入、期望结果、断言可以现在写完。<b>先把测试写红</b>，环境好了直接填实现。</td>
+          </tr>
+          <tr>
+            <td class="id">S1-06</td><td class="nm">数据库迁移落地（alembic）</td><td class="pd">0.5</td>
+            <td><span class="soon">D4 后</span></td>
+            <td>依赖你自己的 S1-05。但在那之前可以先做一件事：<b>把 Docker 拉起来，手工跑一遍 schema.sql</b>，确认 67 条语句在真实 PG 上能过。这个验证上一轮没做成。</td>
+          </tr>
+          <tr>
+            <td class="id">S1-08</td><td class="nm">OpenAPI 契约 v1.0</td><td class="pd">1.5</td>
+            <td><span class="soon">S1-07 后</span></td>
+            <td>顺着 S1-07 自然长出来。不需要等 B，但<b>写之前花 20 分钟问 B 一句</b>：「你每个页面需要哪些字段、哪些筛选、哪些分页？」否则 D8 评审会变成返工。</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="zone">
+      <div class="zone-hd"><span class="tag t2">B 区</span><span class="zt">必须与 B 同时在场 · 不能一个人拍</span>
+        <span class="zm">6 项 · 每个 0.5–2 人天，两人平摊 2.75</span></div>
+      <table>
+        <thead><tr><th style="width:64px">编号</th><th style="width:190px">任务</th><th style="width:70px">人天</th>
+          <th style="width:86px">计划日</th><th>为什么必须两个人 / 你负责的那一半</th></tr></thead>
+        <tbody>
+          <tr>
+            <td class="id">S1-01</td><td class="nm">仓库现场跟单调研</td><td class="pd">2.0</td><td><span class="wait">D1</span></td>
+            <td>不能分头去。两人同看同一单，回来对「哪里停下来找东西」的判断才不会打架。你重点看：<b>一张单据实际改几次、由谁改、改在纸上还是系统里</b>——这直接决定状态机设计。</td>
+          </tr>
+          <tr>
+            <td class="id">S1-02</td><td class="nm">一页纸范围声明</td><td class="pd">1.0</td><td><span class="wait">D2</span></td>
+            <td>范围只有两人共同签字才有效。<b>你负责写「不做什么」那半页</b>，因为你是最容易被需求压垮的人（数据库和接口全是你在改）。</td>
+          </tr>
+          <tr>
+            <td class="id">S1-03</td><td class="nm">3 个痛点 + 3 个可量化指标</td><td class="pd">0.5</td><td><span class="wait">D2</span></td>
+            <td>指标要能落成系统里的字段或查询。你负责判断<b>「这个指标我用现有 8 张表能不能算出来」</b>——算不出来的指标当场砍掉，别留到 D9 才发现缺字段。</td>
+          </tr>
+          <tr>
+            <td class="id">S1-04</td><td class="nm">领域模型评审并冻结 v1.0</td><td class="pd">1.0</td><td><span class="wait">D3</span></td>
+            <td><b>本 Sprint 你最重要的一个会。</b>8 张表逐字段过，冻结后改表必须两人同时在场。你主导，B 从「前端需不需要这个字段」角度挑刺。</td>
+          </tr>
+          <tr>
+            <td class="id">S1-09</td><td class="nm">契约评审并冻结</td><td class="pd">0.5</td><td><span class="wait">D8</span></td>
+            <td>B 是契约的消费者。验收点只有一句：<b>B 能否只靠契约，不加任何额外沟通就做出全部页面。</b>他只要问一次「这个接口还缺个字段」，就说明契约没写到位。</td>
+          </tr>
+          <tr>
+            <td class="id">S1-16</td><td class="nm">Sprint 复盘 + W3 排期</td><td class="pd">0.5</td><td><span class="wait">D10</span></td>
+            <td>你要如实报一件事：<b>apply_txn 实际花了多少时间</b>。这个数决定 P1 阶段（W3–W6）的排期是不是幻想。</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="zone">
+      <div class="zone-hd"><span class="tag t3">C 区</span><span class="zt">需要 B 的输入才能做对 · 不是等交付，是等信息</span>
+        <span class="zm">3 个信息依赖 · 每个只需 10–20 分钟</span></div>
+      <table>
+        <thead><tr><th style="width:150px">什么信息</th><th style="width:96px">影响你的</th><th style="width:86px">什么时候要</th><th>要不到会怎样 / 怎么最快拿到</th></tr></thead>
+        <tbody>
+          <tr>
+            <td class="nm">页面上需要哪些字段和筛选条件</td>
+            <td class="pd">S1-07 / S1-08</td>
+            <td><span class="soon">写契约前</span></td>
+            <td>要不到，契约就会在 D8 被打回重写。最省时的拿法：<b>让 B 直接画 3 张页面的线框图</b>（每张 10 分钟，纸笔即可），比开会对需求快得多。</td>
+          </tr>
+          <tr>
+            <td class="nm">前端容器的目录约定</td>
+            <td class="pd">S1-05</td>
+            <td><span class="now">做骨架时</span></td>
+            <td>骨架里 web 服务挂哪里、端口多少、构建命令是什么，得跟 B 商量一句。不然 B 的 S1-10 第一天就要改你的 compose。<b>约定死：<code>web/</code> + 5173 + <code>npm run dev</code></b>，一句话说完。</td>
+          </tr>
+          <tr>
+            <td class="nm">现场调研里暴露的「单据隐形字段」</td>
+            <td class="pd">S1-06 / S1-15</td>
+            <td><span class="wait">D3 评审前</span></td>
+            <td>仓库实际有大量「系统里没有但业务在用的备注」（比如司机电话、临时改单原因）。这些如果不落字段，上线后全变成微信里的口头约定。<b>D1 调研时你专门记这一栏。</b></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 3 日程 -->
+  <section>
+    <div class="sh"><div class="no">3</div><h2>你的 D1–D10：左边是共同任务，右边是你独立推进的部分</h2>
+      <span class="hint">右列是本方案的关键调整</span></div>
+    <div class="tl">
+      <div class="tl-row hd"><div>日</div><div>两人共同（不可拆）</div><div>你独自可并行推进</div></div>
+      <div class="tl-row"><div class="tl-d">D1</div>
+        <div class="tl-c shared">S1-01 现场跟单（全天）</div>
+        <div class="tl-c solo">晚上 30′：<code>git init</code> + 目录骨架落地</div></div>
+      <div class="tl-row"><div class="tl-d">D2</div>
+        <div class="tl-c shared">S1-02 范围声明 + S1-03 痛点指标</div>
+        <div class="tl-c solo">空隙 1h：docker-compose 跑通 pg16</div></div>
+      <div class="tl-row"><div class="tl-d">D3</div>
+        <div class="tl-c shared">S1-04 模型评审冻结 v1.0（重点）</div>
+        <div class="tl-c solo">会前 30′：带接口清单草稿进会</div></div>
+      <div class="tl-row"><div class="tl-d">D4</div>
+        <div class="tl-c free">—</div>
+        <div class="tl-c solo">S1-05 收尾 + CI · S1-06 迁移落地</div></div>
+      <div class="tl-row"><div class="tl-d">D5</div>
+        <div class="tl-c free">—</div>
+        <div class="tl-c solo">S1-07 定稿 · S1-08 契约开写</div></div>
+      <div class="tl-row"><div class="tl-d">D6</div>
+        <div class="tl-c free">—</div>
+        <div class="tl-c solo">S1-08 契约主体（读接口 + 写接口）</div></div>
+      <div class="tl-row"><div class="tl-d">D7</div>
+        <div class="tl-c free">—</div>
+        <div class="tl-c solo">S1-08 完成 + validate 通过</div></div>
+      <div class="tl-row"><div class="tl-d">D8</div>
+        <div class="tl-c shared">S1-09 契约评审冻结</div>
+        <div class="tl-c solo">评审后 1h：按意见修补，当天冻</div></div>
+      <div class="tl-row"><div class="tl-d">D9</div>
+        <div class="tl-c free">—</div>
+        <div class="tl-c solo">S1-15 apply_txn 五步 + 测试转绿</div></div>
+      <div class="tl-row"><div class="tl-d">D10</div>
+        <div class="tl-c shared">S1-16 复盘 + W3 排期</div>
+        <div class="tl-c solo">上午：S1-15 收尾留缓冲</div></div>
+    </div>
+    <p style="margin-top:11px;font-size:12.2px;color:var(--ink3)">
+      右列 D1–D3 只有 30 分钟–1 小时的碎片量，是<b>刻意从 S1-05 里切出来的</b>：骨架这件事拆开做不占整块时间，但能把 D4 空出来给迁移，D5 就能开始写契约，比原计划早 1 天给到 B。
+    </p>
+  </section>
+
+  <!-- 4 交付物 -->
+  <section>
+    <div class="sh"><div class="no">4</div><h2>你交给 B 的 6 个东西</h2>
+      <span class="hint">B 的空转时间，完全取决于这 6 个东西到得多早</span></div>
+    <div class="dl">
+      <div class="dc">
+        <div class="dt"><span>①</span>可运行的仓库骨架</div>
+        <div class="dp">Canku_project/ （根）<br>docker-compose.yml · Makefile · .github/workflows/ci.yml</div>
+        <div class="dd">交付标准：B 在自己电脑上 <code>git clone</code> + <code>make up</code>，10 分钟内看到 PG 起来。他的 S1-10 从这里开始。<b>最迟 D2 晚。</b></div>
+      </div>
+      <div class="dc">
+        <div class="dt"><span>②</span>前端容器约定</div>
+        <div class="dp">web/ · 5173 · npm run dev</div>
+        <div class="dd">只需一句话说清：目录名、端口、启动命令、构建输出路径。写在 README 里，不要靠口头。<b>D2 给。</b></div>
+      </div>
+      <div class="dc">
+        <div class="dt"><span>③</span>接口清单</div>
+        <div class="dp">contracts/api-list.md</div>
+        <div class="dd">表格式：路径 / 方法 / 读或写 / 是否需要审批 / 一句话说明。B 靠这张表提前知道有哪些页面要画。<b>D5 给。</b></div>
+      </div>
+      <div class="dc">
+        <div class="dt"><span>④</span>OpenAPI 契约</div>
+        <div class="dp">contracts/openapi.yaml</div>
+        <div class="dd"><b>本 Sprint 最关键的交付物。</b>B 的 S1-11（生成 client）和 S1-12（mock server）都从这里长出来，能提前拿到就能提前 2 天开工。<b>目标 D6 给初版。</b></div>
+      </div>
+      <div class="dc">
+        <div class="dt"><span>⑤</span>错误码枚举</div>
+        <div class="dp">contracts/errors.md</div>
+        <div class="dd">库存不足、重复提交、库存被锁定、单据状态非法…… 每个错误码 B 都要能在界面上显示成人话。<b>跟契约一起给，不要分开。</b></div>
+      </div>
+      <div class="dc">
+        <div class="dt"><span>⑥</span>MCP 工具签名草案</div>
+        <div class="dp">contracts/mcp-tools.json（W7 前）</div>
+        <div class="dd">Sprint 1 只需占个位：列出「AI 将来能调哪些动作」的名字和参数形态。不用实现。<b>提前留位，避免 W7 才发现接口设计不支持 Agent 调用。</b></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5 红线 -->
+  <section>
+    <div class="sh r"><div class="no">5</div><h2>你这边的四条红线</h2>
+      <span class="hint">都是「犯了以后要推倒重来」的那种</span></div>
+    <div class="rl">
+      <div class="ri"><div class="rn">R1</div><div class="rt"><b>不要先写业务逻辑，再补契约。</b>你已经习惯了「接口就是 controller 长什么样」，但两人分工下契约是<b>协作合同</b>，不是实现副产物。<em>先契约后实现，顺序反了整个 Sprint 就在返工。</em></div></div>
+      <div class="ri"><div class="rn">R2</div><div class="rt"><b>不要让 B 绕过接口直接读表。</b>他只要连一次数据库查数，你的表结构就再也改不动了。<em>发现他在连库，立刻停下来讨论，不要"先这样跑通"。</em></div></div>
+      <div class="ri"><div class="rn">R3</div><div class="rt"><b>不要把 apply_txn 写成"更新一下库存"。</b>它是全系统唯一的写入点，必须：行锁 → 校验可用量 → 写余额 → 写流水 → 同一事务提交。<em>这里省的行数，会在 W4 用三倍时间还。</em></div></div>
+      <div class="ri"><div class="rn">R4</div><div class="rt"><b>不要一个人改表结构。</b>冻结后改表必须两人同时在场。你一个人顺手加个字段，B 那边的 mock 和类型全废，而且他不知道。<em>这是两人团队最高频的翻车方式。</em></div></div>
+    </div>
+  </section>
+
+  <!-- 6 今天 -->
+  <section>
+    <div class="sh g"><div class="no">6</div><h2>今天 90 分钟：不依赖 D1、不依赖 B、不依赖预算</h2>
+      <span class="hint">做完这四件，明天开始你就是有节奏的</span></div>
+    <div class="todo">
+      <div class="ti"><div class="tt">0–20′</div><div class="tb"><b>把 Docker 拉起来，手工跑一遍 schema.sql</b>
+        <span class="why">上一轮只做了语法校验，没在真实实例上跑过。这里如果炸，D4 的迁移会连带炸。命令：<code>docker run --rm -e POSTGRES_PASSWORD=x -p 5432:5432 -d postgres:16</code> 然后 <code>psql -f db/schema.sql</code>，最后查 <code>v_inventory_recon</code> 是否全 OK。</span></div></div>
+      <div class="ti"><div class="tt">20–50′</div><div class="tb"><b>写接口清单草稿：8 张表 → 资源 → 动作</b>
+        <span class="why">一张表至少对应 2 个接口（列表 + 详情），核心资源加写操作。重点是给每个写接口标注「是否需要人工审批」——这栏现在填，W7 做 Agent 时直接能用。产出到 <code>contracts/api-list.md</code>。</span></div></div>
+      <div class="ti"><div class="tt">50–75′</div><div class="tb"><b>写 apply_txn 的四个测试用例（只要断言，不要实现）</b>
+        <span class="why">正常入库 / 库存不足出库 / 两线程并发扣同一 SKU / 同一 requestId 重复提交。每个用例写清：输入、期望余额、期望流水条数、期望异常。这是 S1-15 的一半工作量，而且不占环境。</span></div></div>
+      <div class="ti"><div class="tt">75–90′</div><div class="tb"><b>问 B 两个问题，只要两个</b>
+        <span class="why">①「前端目录和启动命令你想怎么定？我按你的来。」②「你打算先画哪 3 个页面？画完发我线框图，我照着定字段。」——这两句能省掉后面两次返工。</span></div></div>
+    </div>
+    <div class="note" style="margin-top:13px">
+      <div class="nt">一个顺序上的建议</div>
+      <p>如果今天时间不够，只做第 1 件（环境验证）。理由是它<b>唯一可能推翻已冻结成果</b>——schema.sql 要是在真实 PG 上跑不通，D3 的模型评审就是在评审一份跑不起来的设计。其他三件都可以明天补。</p>
+    </div>
+  </section>
+
+  <div class="foot">
+    <div>仓储智能管理 Agent 系统 · A 成员工作区</div>
+    <div>Sprint 1 · D1–D10 · 独占 5.0 人天 / 共同 2.75 人天</div>
+  </div>
+
+</div>
+</body>
+</html>

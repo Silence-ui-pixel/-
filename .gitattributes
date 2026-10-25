@@ -1,0 +1,38 @@
+# 统一按 LF 存储，避免 Windows 上 CRLF 污染 shell / SQL / YAML
+#
+# 为什么这条不能省：
+#   git 在 Windows 上默认 core.autocrlf=true，会把 .sh 检出成 CRLF，
+#   于是在 Git Bash 里执行必然报 `$'\r': command not found`；
+#   .sql 带 CRLF 进容器后，psql 也可能在字符串字面量里带上 \r。
+#   这类问题报错信息晦涩、排查成本高，最省事的办法就是在这里钉死。
+
+* text=auto eol=lf
+
+*.sh    text eol=lf
+*.sql   text eol=lf
+*.yml   text eol=lf
+*.yaml  text eol=lf
+*.py    text eol=lf
+*.toml  text eol=lf
+Makefile text eol=lf
+Dockerfile text eol=lf
+
+# CSV 给 Excel 用，保持 CRLF（Excel 对 LF 兼容但偶有版本差异）
+*.csv   text eol=crlf
+
+# Windows 批处理必须是 CRLF，否则 cmd 解析异常
+*.cmd   text eol=crlf
+*.bat   text eol=crlf
+
+# 二进制
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.pdf   binary
+*.xlsx  binary
+*.docx  binary
+
+# 导出文件不参与语言统计
+*.html  linguist-documentation
+04-sprint1-tasks.csv linguist-generated
