@@ -1,0 +1,7 @@
+﻿username,display_name,role,position,duty,note
+zhangsan,张三,MANAGER,仓库主管,审批/改单/看报表,审批 AI 建议的人（P2）
+lisi,李四,OPERATOR,收货员,收货/上架,PDA 主力用户
+wangwu,王五,OPERATOR,拣货员,拣货/发货确认,PDA 主力用户
+zhaoliu,赵六,OPERATOR,仓管员,盘点/调拨,⚠️ 盘点与调拨当前系统不支持（见 S1-02）
+chenqi,陈七,ADMIN,系统管理员,用户与基础数据维护,—
+zhouba,周八,VIEWER,财务/老板,只读查看,—
