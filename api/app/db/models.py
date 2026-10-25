@@ -22,33 +22,16 @@ from sqlalchemy import (
     SmallInteger,
     String,
     func,
-    literal_column,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-from sqlalchemy.types import TypeDecorator
 
-# 效期哨兵。核心问题：asyncpg 会把 Python date.max(9999-12-31) 序列化成
-# PG 的 infinity，而 schema.sql 里用的是字面量 date '9999-12-31'，两者不相等，
-# 会导致 uk_inventory_dim 唯一约束维度错配（库存算错）。
-# 因此用 SentinelDate 类型：绑定参数时把 date.max 内联成 SQL 字面量。
-SENTINEL_EXPIRY = "9999-12-31"
+# 效期哨兵：表示「无固定效期 / 永不失效」。
+# 为什么是 9999-12-30 而不是 9999-12-31（date.max）？
+# asyncpg 会把 Python date.max(9999-12-31) 序列化成 PG 的 infinity，
+# 而 infinity <> date '9999-12-31'，会导致唯一约束维度错配（库存静默算错）。
+# date(9999, 12, 30) 是 asyncpg 能正常编码的、语义等价的最大安全日期。
+SENTINEL_EXPIRY = date(9999, 12, 30)
 SENTINEL_BATCH = ""
-
-
-class SentinelDate(TypeDecorator):
-    """Date 变体：date.max 内联为字面量 date '9999-12-31'，避开 asyncpg 的 infinity 映射。"""
-
-    impl = Date
-    cache_ok = True
-
-    def bind_expression(self, bindvalue):
-        from sqlalchemy import case
-
-        # 当绑定值是 date.max 时，返回字面量 date '9999-12-31'；否则原样
-        return case(
-            (bindvalue == date.max, literal_column("date '9999-12-31'")),
-            else_=bindvalue,
-        )
 
 
 class Base(DeclarativeBase):
@@ -127,7 +110,7 @@ class Inventory(Base):
     location_id: Mapped[int] = mapped_column(ForeignKey("location.id"), nullable=False)
     batch_no: Mapped[str] = mapped_column(String(64), nullable=False, default="")
     expiry_date: Mapped[date] = mapped_column(
-        SentinelDate(), nullable=False, default=date.max
+        Date, nullable=False, default=SENTINEL_EXPIRY
     )
     qty_on_hand: Mapped[float] = mapped_column(Numeric(14, 3), nullable=False, default=0)
     qty_allocated: Mapped[float] = mapped_column(Numeric(14, 3), nullable=False, default=0)
@@ -154,7 +137,7 @@ class StockTxn(Base):
     location_id: Mapped[int] = mapped_column(ForeignKey("location.id"), nullable=False)
     batch_no: Mapped[str] = mapped_column(String(64), nullable=False, default="")
     expiry_date: Mapped[date] = mapped_column(
-        SentinelDate(), nullable=False, default=date.max
+        Date, nullable=False, default=SENTINEL_EXPIRY
     )
     on_hand_delta: Mapped[float] = mapped_column(Numeric(14, 3), nullable=False, default=0)
     allocated_delta: Mapped[float] = mapped_column(Numeric(14, 3), nullable=False, default=0)
@@ -168,5 +151,87 @@ class StockTxn(Base):
     operator_id: Mapped[int | None] = mapped_column(ForeignKey("app_user.id"), nullable=True)
     remark: Mapped[str | None] = mapped_column(String(500), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+
+class InboundOrder(Base):
+    """入库单头。状态机：DRAFT → ARRIVED → RECEIVING → RECEIVED → PUTAWAY → DONE / CANCELLED。"""
+
+    __tablename__ = "inbound_order"
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    order_no: Mapped[str] = mapped_column(String(40), unique=True, nullable=False)
+    order_type: Mapped[str] = mapped_column(String(16), nullable=False, default="PO")
+    supplier_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="DRAFT")
+    expected_at: Mapped[date | None] = mapped_column(Date, nullable=True)
+    received_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    total_expected_qty: Mapped[float] = mapped_column(Numeric(14, 3), nullable=False, default=0)
+    total_received_qty: Mapped[float] = mapped_column(Numeric(14, 3), nullable=False, default=0)
+    remark: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    created_by: Mapped[int | None] = mapped_column(ForeignKey("app_user.id"), nullable=True)
+    version: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+
+class OutboundOrder(Base):
+    """出库单头。状态机：DRAFT → ALLOCATED → PICKING → PICKED → SHIPPED / CANCELLED。"""
+
+    __tablename__ = "outbound_order"
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    order_no: Mapped[str] = mapped_column(String(40), unique=True, nullable=False)
+    order_type: Mapped[str] = mapped_column(String(16), nullable=False, default="SALE")
+    customer_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="DRAFT")
+    priority: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=100)
+    carrier: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    tracking_no: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    requested_ship_at: Mapped[date | None] = mapped_column(Date, nullable=True)
+    shipped_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    total_qty: Mapped[float] = mapped_column(Numeric(14, 3), nullable=False, default=0)
+    remark: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    created_by: Mapped[int | None] = mapped_column(ForeignKey("app_user.id"), nullable=True)
+    version: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+
+class OrderLine(Base):
+    """单据明细，入库/出库共用，order_type 判别归属（IN / OUT）。"""
+
+    __tablename__ = "order_line"
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    order_type: Mapped[str] = mapped_column(String(3), nullable=False)
+    inbound_id: Mapped[int | None] = mapped_column(ForeignKey("inbound_order.id"), nullable=True)
+    outbound_id: Mapped[int | None] = mapped_column(ForeignKey("outbound_order.id"), nullable=True)
+    line_no: Mapped[int] = mapped_column(Integer, nullable=False)
+    sku_id: Mapped[int] = mapped_column(ForeignKey("sku.id"), nullable=False)
+    qty_required: Mapped[float] = mapped_column(Numeric(14, 3), nullable=False)
+    qty_actual: Mapped[float] = mapped_column(Numeric(14, 3), nullable=False, default=0)
+    qty_rejected: Mapped[float] = mapped_column(Numeric(14, 3), nullable=False, default=0)
+    batch_no: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    expiry_date: Mapped[date] = mapped_column(
+        Date, nullable=False, default=SENTINEL_EXPIRY
+    )
+    from_location_id: Mapped[int | None] = mapped_column(ForeignKey("location.id"), nullable=True)
+    to_location_id: Mapped[int | None] = mapped_column(ForeignKey("location.id"), nullable=True)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="OPEN")
+    remark: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )

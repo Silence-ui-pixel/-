@@ -24,7 +24,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import InventoryInsufficient
-from app.db.models import Inventory, StockTxn
+from app.db.models import SENTINEL_EXPIRY, Inventory, StockTxn
 
 
 async def apply_txn(
@@ -35,7 +35,7 @@ async def apply_txn(
     sku_id: int,
     location_id: int,
     batch_no: str = "",
-    expiry_date: date = date.max,
+    expiry_date: date = SENTINEL_EXPIRY,
     on_hand_delta: float = 0,
     allocated_delta: float = 0,
     ref_type: str | None = None,

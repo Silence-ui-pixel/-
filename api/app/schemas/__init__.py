@@ -145,3 +145,98 @@ class ReconItem(BaseModel):
 
 class ReconResponse(BaseModel):
     items: list[ReconItem]
+
+
+# ---------- 单据：明细 ----------
+class OrderLine(BaseModel):
+    id: int
+    line_no: int
+    sku_id: int
+    sku_code: str
+    sku_name: str
+    qty_required: float
+    qty_actual: float
+    qty_rejected: float
+    batch_no: str
+    expiry_date: date
+    from_location_id: int | None = None
+    to_location_id: int | None = None
+    status: str
+
+
+class LineCreate(BaseModel):
+    sku_id: int
+    qty_required: float
+
+
+class LineUpdate(BaseModel):
+    qty_required: float
+
+
+# ---------- 单据：入库 ----------
+class InboundOrder(ORMModel):
+    id: int
+    order_no: str
+    order_type: str
+    supplier_name: str | None = None
+    status: str
+    expected_at: date | None = None
+    received_at: datetime | None = None
+    total_expected_qty: float
+    total_received_qty: float
+    remark: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class InboundOrderCreate(BaseModel):
+    order_type: str = "PO"
+    supplier_name: str | None = None
+    expected_at: date | None = None
+    remark: str | None = None
+    lines: list[LineCreate]
+
+
+class InboundOrderDetail(InboundOrder):
+    lines: list[OrderLine]
+
+
+class InboundOrderListResponse(BaseModel):
+    items: list[InboundOrder]
+    meta: PageMeta
+
+
+# ---------- 单据：出库 ----------
+class OutboundOrder(ORMModel):
+    id: int
+    order_no: str
+    order_type: str
+    customer_name: str | None = None
+    status: str
+    priority: int
+    carrier: str | None = None
+    tracking_no: str | None = None
+    requested_ship_at: date | None = None
+    shipped_at: datetime | None = None
+    total_qty: float
+    remark: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class OutboundOrderCreate(BaseModel):
+    order_type: str = "SALE"
+    customer_name: str | None = None
+    priority: int = 100
+    requested_ship_at: date | None = None
+    remark: str | None = None
+    lines: list[LineCreate]
+
+
+class OutboundOrderDetail(OutboundOrder):
+    lines: list[OrderLine]
+
+
+class OutboundOrderListResponse(BaseModel):
+    items: list[OutboundOrder]
+    meta: PageMeta

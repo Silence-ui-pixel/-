@@ -14,7 +14,7 @@ import pytest
 from sqlalchemy import func, select, text
 
 from app.core.errors import InventoryInsufficient
-from app.db.models import Inventory, StockTxn
+from app.db.models import SENTINEL_EXPIRY, Inventory, StockTxn
 from app.services.stock_service import apply_txn
 
 
@@ -263,7 +263,7 @@ async def _seed_inventory(
         sku_id=sku_id,
         location_id=location_id,
         batch_no=batch,
-        expiry_date=date.max,
+        expiry_date=SENTINEL_EXPIRY,
         qty_on_hand=on_hand,
         qty_allocated=allocated,
         version=0,

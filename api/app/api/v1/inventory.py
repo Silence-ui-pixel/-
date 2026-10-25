@@ -54,7 +54,7 @@ async def list_inventory(
         # N 天内到期：expiry_date 在当前到 N 天后之间，且不是哨兵值
         stmt = stmt.where(
             Inventory.expiry_date <= func.current_date() + text(f"interval '{expiring_days} days'"),
-            Inventory.expiry_date != text("date '9999-12-31'"),
+            Inventory.expiry_date != text("date '9999-12-30'"),
         )
     if only_available:
         stmt = stmt.where(Inventory.qty_available > 0)

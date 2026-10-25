@@ -128,7 +128,7 @@ def upgrade() -> None:
         sa.Column("sku_id", sa.BigInteger(), nullable=False),
         sa.Column("location_id", sa.BigInteger(), nullable=False),
         sa.Column("batch_no", sa.String(64), nullable=False, server_default=""),
-        sa.Column("expiry_date", sa.Date(), nullable=False, server_default=sa.text("'9999-12-31'")),
+        sa.Column("expiry_date", sa.Date(), nullable=False, server_default=sa.text("'9999-12-30'")),
         sa.Column("qty_on_hand", sa.Numeric(14, 3), nullable=False, server_default="0"),
         sa.Column("qty_allocated", sa.Numeric(14, 3), nullable=False, server_default="0"),
         sa.Column("version", sa.BigInteger(), nullable=False, server_default="0"),
@@ -149,7 +149,7 @@ def upgrade() -> None:
     )
     op.create_index("idx_inventory_sku", "inventory", ["sku_id"], postgresql_where=sa.text("qty_on_hand > 0"))
     op.create_index("idx_inventory_loc", "inventory", ["location_id"], postgresql_where=sa.text("qty_on_hand > 0"))
-    op.create_index("idx_inventory_expiry", "inventory", ["expiry_date"], postgresql_where=sa.text("expiry_date < '9999-12-31' and qty_on_hand > 0"))
+    op.create_index("idx_inventory_expiry", "inventory", ["expiry_date"], postgresql_where=sa.text("expiry_date < '9999-12-30' and qty_on_hand > 0"))
     op.execute("create trigger tg_inventory_updated_at before update on inventory for each row execute function trg_set_updated_at()")
     op.execute("comment on table inventory is '库存余额。唯一写入入口，写必落 stock_txn'")
     op.execute("comment on column inventory.qty_on_hand is '现有量（物理在库）'")
@@ -166,7 +166,7 @@ def upgrade() -> None:
         sa.Column("sku_id", sa.BigInteger(), nullable=False),
         sa.Column("location_id", sa.BigInteger(), nullable=False),
         sa.Column("batch_no", sa.String(64), nullable=False, server_default=""),
-        sa.Column("expiry_date", sa.Date(), nullable=False, server_default=sa.text("'9999-12-31'")),
+        sa.Column("expiry_date", sa.Date(), nullable=False, server_default=sa.text("'9999-12-30'")),
         sa.Column("on_hand_delta", sa.Numeric(14, 3), nullable=False, server_default="0"),
         sa.Column("allocated_delta", sa.Numeric(14, 3), nullable=False, server_default="0"),
         sa.Column("before_on_hand", sa.Numeric(14, 3), nullable=False),
@@ -273,7 +273,7 @@ def upgrade() -> None:
     op.create_table(
         "order_line",
         sa.Column("id", sa.BigInteger(), sa.Identity(), primary_key=True),
-        sa.Column("order_type", sa.String(2), nullable=False),
+        sa.Column("order_type", sa.String(3), nullable=False),
         sa.Column("inbound_id", sa.BigInteger(), nullable=True),
         sa.Column("outbound_id", sa.BigInteger(), nullable=True),
         sa.Column("line_no", sa.Integer(), nullable=False),
@@ -282,7 +282,7 @@ def upgrade() -> None:
         sa.Column("qty_actual", sa.Numeric(14, 3), nullable=False, server_default="0"),
         sa.Column("qty_rejected", sa.Numeric(14, 3), nullable=False, server_default="0"),
         sa.Column("batch_no", sa.String(64), nullable=False, server_default=""),
-        sa.Column("expiry_date", sa.Date(), nullable=False, server_default=sa.text("'9999-12-31'")),
+        sa.Column("expiry_date", sa.Date(), nullable=False, server_default=sa.text("'9999-12-30'")),
         sa.Column("from_location_id", sa.BigInteger(), nullable=True),
         sa.Column("to_location_id", sa.BigInteger(), nullable=True),
         sa.Column("status", sa.String(16), nullable=False, server_default="OPEN"),

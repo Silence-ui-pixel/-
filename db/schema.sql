@@ -134,7 +134,7 @@ create trigger tg_location_updated_at before update on location
 -- 4. inventory  库存余额（全系统唯一写入点）
 --
 --    唯一维度: sku_id + location_id + batch_no + expiry_date
---    关键技巧: batch_no 用空串、expiry_date 用哨兵日期 9999-12-31
+--    关键技巧: batch_no 用空串、expiry_date 用哨兵日期 9999-12-30
 --             因为在 PostgreSQL 中 NULL <> NULL，若允许 NULL 则唯一约束会失效，
 --             同一维度会被重复插入多行，库存直接算错。
 -- =============================================================================
@@ -143,7 +143,7 @@ create table inventory (
   sku_id         bigint        not null references sku(id),
   location_id    bigint        not null references location(id),
   batch_no       varchar(64)   not null default '',
-  expiry_date    date          not null default '9999-12-31',
+  expiry_date    date          not null default '9999-12-30',
   qty_on_hand    numeric(14,3) not null default 0,
   qty_allocated  numeric(14,3) not null default 0,
   qty_available  numeric(14,3) generated always as (qty_on_hand - qty_allocated) stored,
@@ -162,7 +162,7 @@ comment on column inventory.version       is '乐观锁版本号，并发扣减�
 create index idx_inventory_sku    on inventory (sku_id) where qty_on_hand > 0;
 create index idx_inventory_loc    on inventory (location_id) where qty_on_hand > 0;
 create index idx_inventory_expiry on inventory (expiry_date)
-  where expiry_date < '9999-12-31' and qty_on_hand > 0;
+  where expiry_date < '9999-12-30' and qty_on_hand > 0;
 
 create trigger tg_inventory_updated_at before update on inventory
   for each row execute function trg_set_updated_at();
@@ -182,7 +182,7 @@ create table stock_txn (
   sku_id           bigint        not null references sku(id),
   location_id      bigint        not null references location(id),
   batch_no         varchar(64)   not null default '',
-  expiry_date      date          not null default '9999-12-31',
+  expiry_date      date          not null default '9999-12-30',
   on_hand_delta    numeric(14,3) not null default 0,         -- 现有量变化，
   allocated_delta  numeric(14,3) not null default 0,         -- 分配量变化
   before_on_hand   numeric(14,3) not null,
@@ -304,7 +304,7 @@ create trigger tg_outbound_updated_at before update on outbound_order
 -- =============================================================================
 create table order_line (
   id                bigserial     primary key,
-  order_type        char(2)       not null,                  -- IN / OUT
+  order_type        char(3)       not null,                  -- IN / OUT
   inbound_id        bigint        references inbound_order(id),
   outbound_id       bigint        references outbound_order(id),
   line_no           integer       not null,
@@ -313,7 +313,7 @@ create table order_line (
   qty_actual        numeric(14,3) not null default 0,        -- 实收 / 实拣
   qty_rejected      numeric(14,3) not null default 0,        -- 不良 / 短拣
   batch_no          varchar(64)   not null default '',
-  expiry_date       date          not null default '9999-12-31',
+  expiry_date       date          not null default '9999-12-30',
   from_location_id  bigint        references location(id),   -- 出库: 拣货库位
   to_location_id    bigint        references location(id),   -- 入库: 上架库位
   status            varchar(16)   not null default 'OPEN',
