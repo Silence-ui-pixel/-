@@ -104,3 +104,25 @@
 - 之后 S1-15b apply_txn 实现（四用例断言已备好，先红后绿）
 
 ---
+
+## 2026-10-25 (D1 · S1-15b 完成)
+
+**推进**
+- 实现 `stock_service.apply_txn`（库存唯一写入口）：锁行→查幂等→校验可用量→写余额→写流水，五步同事务
+- 新增 ORM 模型（Inventory/StockTxn/Sku/Location，含 qty_available 生成列）
+- 新增 DomainError + InventoryInsufficient 异常（code + detail）
+- 四个用例全绿（正常入库/库存不足/并发/幂等），全套 7 个测试通过
+
+**踩坑（2 个真实 bug，都是测试抓出来的）**
+1. **校验 bug**：写成 `on_hand >= 需求`，应为「可用量(=on_hand-allocated) >= 需求」。否则「已分配一部分」的维度会超卖——这正是 TC-02 设计这个维度的目的
+2. **asyncpg infinity 坑**：`date.max(9999-12-31)` 被 asyncpg 序列化成 PG 的 `infinity`，与 schema 字面量 `date '9999-12-31'` 不相等，唯一约束维度错配。解法：新增 `SentinelDate` 类型装饰器，bind_expression 时把 date.max 内联成字面量
+
+**协作进展**
+- B 看到我的审查结论后，主动更新线框图：采纳 3 待敲定点 + 5 补充点，新增「D3 待确认清单」
+- 分歧基本已通过文档对齐，D3 只剩「库存查询页默认列」待定
+
+**明天第一步**
+- S1-08 OpenAPI 契约（把 api-list 翻译成 openapi.yaml，B 线框图已就绪）
+- D3 当面评审（敲定默认列 + 冻结）
+
+---
