@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { UserRole } from '@/types/models'
+import { client } from '@/api/client'
 
 const TOKEN_KEY = 'wms_token'
 const USER_KEY = 'wms_user'
@@ -45,12 +46,30 @@ export const useAuthStore = defineStore('auth', () => {
     return roles.includes(role.value)
   }
 
-  // 假登录：不接后端，直接写入本地 token 与用户信息
-  function login(username: string, displayName: string, role: UserRole) {
-    token.value = `fake-token-${Date.now()}`
-    user.value = { username, displayName, role }
-    localStorage.setItem(TOKEN_KEY, token.value)
-    localStorage.setItem(USER_KEY, JSON.stringify(user.value))
+  /**
+   * 真实登录：POST /auth/login 换 JWT → GET /users/me 取用户信息（含角色）。
+   * - 失败时 client 已把后端错误转成 ApiError（中文 message），由调用方 catch 展示；
+   * - 角色仅用于前端体验拦截（菜单/按钮），最终鉴权由后端兜底。
+   */
+  async function login(username: string, password: string): Promise<void> {
+    const { data } = await client.POST('/auth/login', {
+      body: { username, password },
+    })
+    if (!data?.access_token) throw new Error('登录失败：未返回 token')
+
+    token.value = data.access_token
+    localStorage.setItem(TOKEN_KEY, data.access_token)
+
+    // 拉取当前用户：角色决定菜单与按钮可见性
+    const { data: me } = await client.GET('/users/me')
+    if (me) {
+      user.value = {
+        username: me.username ?? username,
+        displayName: me.display_name ?? username,
+        role: (me.role as UserRole) ?? 'VIEWER',
+      }
+      localStorage.setItem(USER_KEY, JSON.stringify(user.value))
+    }
   }
 
   function logout() {

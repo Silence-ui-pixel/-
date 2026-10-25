@@ -69,7 +69,7 @@
           </el-button>
         </el-form>
 
-        <div class="tip">骨架阶段：输入任意用户名即可登录（假 token）</div>
+        <div class="tip">演示账号：admin / admin123 · sup01 / sup123 · op01 / op123</div>
       </div>
 
       <!-- 卡通人物（右侧，不挡表单） -->
@@ -89,6 +89,7 @@ import { reactive, ref, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
+import { ApiError } from '@/api/client'
 import BgAnimation from './components/BgAnimation.vue'
 import CustomCursor from './components/CustomCursor.vue'
 import Mascot, { type MascotState } from './components/Mascot.vue'
@@ -149,9 +150,9 @@ async function onSubmit() {
 
   loading.value = true
   try {
-    // TODO: 替换为真实登录接口
-    await fakeLogin()
-    auth.login(form.username.trim(), form.username.trim(), 'OPERATOR')
+    // 真实登录：POST /auth/login 换 JWT → GET /users/me 取角色
+    await auth.login(form.username.trim(), form.password)
+    loading.value = false
     isSuccess.value = true
     ElMessage.success('登录成功')
     // 停留片刻展示「比耶」动画，再跳转
@@ -159,14 +160,11 @@ async function onSubmit() {
       const redirect = (route.query.redirect as string) || '/dashboard'
       router.push(redirect)
     }, 1200)
-  } catch {
-    ElMessage.error('登录失败，请重试')
+  } catch (e) {
+    // client 已把后端错误转成 ApiError（中文 message）
+    ElMessage.error(e instanceof ApiError ? e.message : '登录失败，请重试')
     loading.value = false
   }
-}
-
-function fakeLogin(): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, 900))
 }
 </script>
 

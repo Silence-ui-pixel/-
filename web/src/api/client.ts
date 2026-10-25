@@ -76,7 +76,12 @@ client.use({
       .catch(() => null)
 
     const code: string | undefined = body?.code
-    const message: string = body?.message ?? getErrorMessage(code ?? '')
+    // 兼容两种错误体：
+    //   1) 契约格式 { code, message, detail }（mock 与目标实现）
+    //   2) FastAPI 默认 { detail: "中文描述" }（当前后端部分接口的实际返回）
+    const rawDetail = body?.detail
+    const message: string =
+      body?.message ?? (typeof rawDetail === 'string' ? rawDetail : undefined) ?? getErrorMessage(code ?? '')
     throw new ApiError(code, message, body?.detail, response.status)
   },
 })
