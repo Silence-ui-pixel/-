@@ -292,6 +292,19 @@ export const routes: AppRouteRecord[] = [
           roles: ['ADMIN', 'MANAGER', 'OPERATOR'],
         },
       },
+      {
+        // PDA 出库作业：拣货（O5）+ 发运（O6）
+        path: 'outbound',
+        name: 'pda-outbound',
+        component: () => import('@/views/pda/outbound/index.vue'),
+        meta: {
+          title: '出库作业',
+          icon: 'Upload',
+          layout: 'pda',
+          keepAlive: false,
+          roles: ['ADMIN', 'MANAGER', 'OPERATOR'],
+        },
+      },
     ],
   },
 
