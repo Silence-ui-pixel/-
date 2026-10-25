@@ -23,8 +23,8 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import DomainError, InvalidStatusTransition
-from app.core.security import get_current_user
-from app.db.models import SENTINEL_EXPIRY, InboundOrder, Location, OrderLine, Sku
+from app.core.security import get_current_user, require_role
+from app.db.models import SENTINEL_EXPIRY, InboundOrder, Location, OrderLine, Sku, StockTxn
 from app.db.session import get_session
 from app.schemas import (
     InboundOrder as InboundOrderSchema,
@@ -208,6 +208,7 @@ async def update_inbound_line(
     order_id: int,
     line_id: int,
     body: LineUpdate,
+    current: dict = Depends(require_role("MANAGER", "ADMIN")),
     session: AsyncSession = Depends(get_session),
 ) -> OrderLineSchema:
     order = await _get_order(session, order_id)
@@ -232,9 +233,10 @@ async def update_inbound_line(
     return _to_line_schema(line, sku)
 
 
-@router.post("/{order_id}/cancel", response_model=InboundOrderDetail, summary="取消入库单")
+@router.post("/{order_id}/cancel", response_model=InboundOrderDetail, summary="取消入库单（需 MANAGER/ADMIN）")
 async def cancel_inbound_order(
     order_id: int,
+    current: dict = Depends(require_role("MANAGER", "ADMIN")),
     session: AsyncSession = Depends(get_session),
 ) -> InboundOrderDetail:
     order = await _get_order(session, order_id)
@@ -278,12 +280,14 @@ async def receive_inbound_order(
     设计要点：
     1. 货进「暂存位」而不是直接进存储位 —— 因为还没上架，位置未定。
        但账上必须有它，否则「仓库里有一堆货，系统说没有」，这是最典型的账实不符。
-    2. 一次收货完成整单（状态直接到 RECEIVED）。支持部分收货会导致同一明细
-       产生多条 RECEIPT 流水，txn_no 无法再天然幂等，Sprint 1 不做。
+    2. 支持分次收货（一车货分两批到是真实场景）：
+       - 明细实收量累加，收满（>= qty_required）才置 DONE，否则 PARTIAL
+       - 单头全部明细收满才置 RECEIVED，否则 RECEIVING（可继续收）
     3. 允许超收（供应商多发）。schema 的 ck_line_out_qty 明确只约束出库超拣，
        入库超收是真实业务场景，拦掉会让作业员没法录真实数量。
 
-    幂等：txn_no = RECEIPT-{order_id}-{line_id}，同一明细天然只能成功一次；
+    幂等：txn_no = RECEIPT-{order_id}-{line_id}-{seq}，seq 是该明细已有
+    收货流水数 + 1。同一批次自然唯一，同一次请求重放时 seq 相同、命中幂等。
     Idempotency-Key 头用于挡住 PDA 弱网重试造成的重复请求。
     """
     order = await _get_order(session, order_id)
@@ -303,6 +307,7 @@ async def receive_inbound_order(
     receiving = await get_receiving_location(session)
     now = datetime.now(UTC)
     total_received = 0.0
+    all_done = True
 
     for item in body.lines:
         pair = all_lines.get(item.line_id)
@@ -330,9 +335,22 @@ async def receive_inbound_order(
         qty_in = float(item.qty_actual)
 
         if qty_in > 0:
+            # 序号 = 该明细已有 RECEIPT 流水数 + 1，保证分次收货 txn_no 唯一
+            seq = (
+                await session.execute(
+                    select(func.count())
+                    .select_from(StockTxn)
+                    .where(
+                        StockTxn.ref_type == "INBOUND",
+                        StockTxn.ref_id == order.id,
+                        StockTxn.ref_line_id == line.id,
+                        StockTxn.txn_type == "RECEIPT",
+                    )
+                )
+            ).scalar_one()
             await apply_txn(
                 session,
-                txn_no=f"RECEIPT-{order.id}-{line.id}",
+                txn_no=f"RECEIPT-{order.id}-{line.id}-{seq + 1}",
                 txn_type="RECEIPT",
                 sku_id=line.sku_id,
                 location_id=receiving.id,
@@ -348,17 +366,28 @@ async def receive_inbound_order(
                 remark=f"收货 {order.order_no}",
             )
 
-        line.qty_actual = qty_in
+        # 实收量累加（分次收货），不良量覆盖为本次值
+        line.qty_actual = float(line.qty_actual or 0) + qty_in
         line.qty_rejected = float(item.qty_rejected or 0)
         line.batch_no = batch_no
         line.expiry_date = expiry
-        # 实收为 0 的明细直接终结（供应商没发这一项），避免留在 OPEN 卡住后续流程
-        line.status = "DONE" if qty_in > 0 else "CANCELLED"
-        total_received += qty_in
+        # 收满才算 DONE；没收满且本次收了货则 PARTIAL（可继续收）
+        # 实收为 0 且从未收过货，供应商没发这一项，直接 CANCELLED 避免卡流程
+        if line.qty_actual >= float(line.qty_required):
+            line.status = "DONE"
+        elif qty_in > 0 or line.qty_actual > 0:
+            line.status = "PARTIAL"
+        else:
+            line.status = "CANCELLED"
 
-    order.total_received_qty = total_received
+        total_received += qty_in
+        if line.status != "DONE":
+            all_done = False
+
+    order.total_received_qty = float(order.total_received_qty or 0) + total_received
     order.received_at = now
-    order.status = "RECEIVED"
+    # 全部明细收满才完结，否则留在 RECEIVING 等待下一批到货
+    order.status = "RECEIVED" if all_done else "RECEIVING"
     order.version = (order.version or 0) + 1
 
     try:

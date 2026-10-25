@@ -61,3 +61,31 @@ async def get_current_user(
         "role": payload["role"],
         "username": payload["username"],
     }
+
+
+def require_role(*roles: str):
+    """角色鉴权依赖工厂：限制接口只允许指定角色访问。
+
+    用法：
+        @router.post("/...")
+        async def foo(current: dict = Depends(require_role("MANAGER", "ADMIN"))):
+            ...
+
+    角色不匹配时抛 403 FORBIDDEN（走契约统一错误格式）。
+    """
+
+    async def _check(current: dict = Depends(get_current_user)) -> dict:
+        if current["role"] not in roles:
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "message": "没有权限执行此操作",
+                    "detail": {
+                        "required_roles": list(roles),
+                        "your_role": current["role"],
+                    },
+                },
+            )
+        return current
+
+    return _check

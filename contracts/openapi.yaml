@@ -850,7 +850,7 @@ paths:
         schema: { type: integer }
     patch:
       tags: [inbound]
-      summary: 改明细数量（仅 DRAFT）
+      summary: 改明细数量（仅 DRAFT，需 MANAGER/ADMIN）
       operationId: update_inbound_line
       security: [{ bearerAuth: [] }]
       requestBody:
@@ -868,6 +868,11 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/OrderLine" }
+        "403":
+          description: 角色不足（需 MANAGER/ADMIN）
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
         "409":
           description: 状态不是 DRAFT，不能改
           content:
@@ -882,7 +887,12 @@ paths:
         schema: { type: integer }
     post:
       tags: [inbound]
-      summary: 收货（写暂存位，走 apply_txn RECEIPT）
+      summary: 收货（写暂存位，走 apply_txn RECEIPT；支持分次收货）
+      description: |
+        支持分次收货：同一明细可多次调用，实收量累加。
+        - 全部明细收满（实收 >= 应收）→ 单头 RECEIVED，明细 DONE
+        - 未收满 → 单头 RECEIVING，明细 PARTIAL，可继续收货
+        - 允许超收（实收 > 应收），入库是真实业务场景
       operationId: receive_inbound_order
       security: [{ bearerAuth: [] }]
       parameters:
@@ -900,7 +910,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/InboundOrderDetail" }
         "409":
-          description: 状态不允许收货 或 实收超过应收
+          description: 状态不允许收货（已 RECEIVED/PUTAWAY/DONE 等）
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
@@ -944,7 +954,7 @@ paths:
         schema: { type: integer }
     post:
       tags: [inbound]
-      summary: 取消入库单（仅 DRAFT/ARRIVED）
+      summary: 取消入库单（仅 DRAFT/ARRIVED，需 MANAGER/ADMIN）
       operationId: cancel_inbound_order
       security: [{ bearerAuth: [] }]
       responses:
@@ -953,6 +963,11 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/InboundOrder" }
+        "403":
+          description: 角色不足（需 MANAGER/ADMIN）
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
         "409":
           description: 状态不允许取消
           content:
@@ -1037,7 +1052,7 @@ paths:
         schema: { type: integer }
     post:
       tags: [outbound]
-      summary: 分配库存（按明细行 FEFO 锁批次，只动 allocated_delta）
+      summary: 分配库存（按明细行 FEFO 锁批次，只动 allocated_delta；过期批次不参与）
       operationId: allocate_outbound_order
       security: [{ bearerAuth: [] }]
       parameters:
@@ -1050,7 +1065,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/OutboundOrderDetail" }
         "409":
-          description: 库存不足（detail 带 sku_code/batch_no/required/available/shortfall）
+          description: 库存不足（含「仅有过期批次」场景；detail 带 sku_code/batch_no/required/available/shortfall）
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
@@ -1131,7 +1146,7 @@ paths:
         schema: { type: integer }
     post:
       tags: [outbound]
-      summary: 取消出库单（DRAFT/ALLOCATED，ALLOCATED 走 DEALLOCATE 回滚）
+      summary: 取消出库单（DRAFT/ALLOCATED，需 MANAGER/ADMIN，ALLOCATED 走 DEALLOCATE 回滚）
       operationId: cancel_outbound_order
       security: [{ bearerAuth: [] }]
       parameters:
@@ -1142,6 +1157,11 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/OutboundOrder" }
+        "403":
+          description: 角色不足（需 MANAGER/ADMIN）
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
         "409":
           description: 状态不允许取消
           content:

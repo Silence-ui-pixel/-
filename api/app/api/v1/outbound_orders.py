@@ -30,7 +30,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import DomainError, InvalidStatusTransition, InventoryInsufficient
-from app.core.security import get_current_user
+from app.core.security import get_current_user, require_role
 from app.db.models import Location, OrderLine, OutboundOrder, Sku
 from app.db.session import get_session
 from app.schemas import (
@@ -207,10 +207,10 @@ async def get_outbound_order(
     )
 
 
-@router.post("/{order_id}/cancel", response_model=OutboundOrderDetail, summary="取消出库单")
+@router.post("/{order_id}/cancel", response_model=OutboundOrderDetail, summary="取消出库单（需 MANAGER/ADMIN）")
 async def cancel_outbound_order(
     order_id: int,
-    current: dict = Depends(get_current_user),
+    current: dict = Depends(require_role("MANAGER", "ADMIN")),
     session: AsyncSession = Depends(get_session),
     agent_run_id: str | None = Header(default=None, alias="X-Agent-Run-Id"),
 ) -> OutboundOrderDetail:

@@ -234,47 +234,94 @@ async def test_receive_requires_batch_for_batch_managed(client, session, clean_a
     assert "批次" in err["message"]
 
 
-async def test_receive_twice_returns_conflict(client, session, clean_all):
-    """重复收货必须 409，且库存不能翻倍。"""
+async def test_receive_twice_accumulates(client, session, clean_all):
+    """分次收货：实收量累加，收满才 RECEIVED，中途为 RECEIVING / PARTIAL。"""
     token = await _login(client)
     sku_id, _ = await _ids(session)
 
     created = await client.post(
         "/api/v1/inbound-orders",
-        json={"order_type": "PO", "lines": [{"sku_id": sku_id, "qty_required": 20}]},
+        json={"order_type": "PO", "lines": [{"sku_id": sku_id, "qty_required": 100}]},
         headers=_auth(token),
     )
     order = created.json()
-    body = {
-        "lines": [
-            {
-                "line_id": order["lines"][0]["id"],
-                "qty_actual": 20,
-                "batch_no": BATCH,
-                "expiry_date": "2027-01-01",
-            }
-        ]
-    }
+    line_id = order["lines"][0]["id"]
+
+    # 第 1 次：只到 40 件，没收满
+    first = await client.post(
+        f"/api/v1/inbound-orders/{order['id']}/receive",
+        json={
+            "lines": [
+                {"line_id": line_id, "qty_actual": 40, "batch_no": BATCH, "expiry_date": "2027-01-01"}
+            ]
+        },
+        headers=_auth(token),
+    )
+    assert first.status_code == 200, first.text
+    assert first.json()["status"] == "RECEIVING"
+    assert first.json()["lines"][0]["status"] == "PARTIAL"
+    assert first.json()["lines"][0]["qty_actual"] == 40
+    assert first.json()["total_received_qty"] == 40
+
+    # 第 2 次：再收 60 件，收满
+    second = await client.post(
+        f"/api/v1/inbound-orders/{order['id']}/receive",
+        json={
+            "lines": [
+                {"line_id": line_id, "qty_actual": 60, "batch_no": BATCH, "expiry_date": "2027-01-01"}
+            ]
+        },
+        headers=_auth(token),
+    )
+    assert second.status_code == 200, second.text
+    assert second.json()["status"] == "RECEIVED"
+    assert second.json()["lines"][0]["status"] == "DONE"
+    assert second.json()["lines"][0]["qty_actual"] == 100
+    assert second.json()["total_received_qty"] == 100
+
+    # 库存不翻倍：实收 100 正好（不是 40+60 之外再多）
+    assert await _stock_at(session, sku_id, RECEIVING) == 100
+    assert await _recon_bad(session) == 0
+
+
+async def test_receive_over_receive_accumulates(client, session, clean_all):
+    """超收场景：分次累计可超过 qty_required，状态仍 RECEIVED。"""
+    token = await _login(client)
+    sku_id, _ = await _ids(session)
+
+    created = await client.post(
+        "/api/v1/inbound-orders",
+        json={"order_type": "PO", "lines": [{"sku_id": sku_id, "qty_required": 100}]},
+        headers=_auth(token),
+    )
+    order = created.json()
+    line_id = order["lines"][0]["id"]
 
     first = await client.post(
         f"/api/v1/inbound-orders/{order['id']}/receive",
-        json=body,
+        json={
+            "lines": [
+                {"line_id": line_id, "qty_actual": 80, "batch_no": BATCH, "expiry_date": "2027-01-01"}
+            ]
+        },
         headers=_auth(token),
     )
-    assert first.status_code == 200
+    assert first.json()["status"] == "RECEIVING"
 
     second = await client.post(
         f"/api/v1/inbound-orders/{order['id']}/receive",
-        json=body,
+        json={
+            "lines": [
+                {"line_id": line_id, "qty_actual": 40, "batch_no": BATCH, "expiry_date": "2027-01-01"}
+            ]
+        },
         headers=_auth(token),
     )
-    assert second.status_code == 409
-    err = second.json()
-    assert err["code"] == "INVALID_STATUS_TRANSITION"
-    assert err["detail"]["current_status"] == "RECEIVED"
-
-    # 关键：库存没被重复加
-    assert await _stock_at(session, sku_id, RECEIVING) == 20
+    assert second.status_code == 200, second.text
+    assert second.json()["status"] == "RECEIVED"
+    assert second.json()["lines"][0]["qty_actual"] == 120  # 超收 20
+    assert await _stock_at(session, sku_id, RECEIVING) == 120
+    assert await _recon_bad(session) == 0
 
 
 # ---------------------------------------------------------------------------
@@ -435,6 +482,96 @@ async def test_cancel_allocated_releases_stock(client, session, clean_all):
     assert await _recon_bad(session) == 0
 
 
+async def test_cancel_inbound_requires_manager(client, session, clean_all):
+    """取消入库单：OPERATOR 被拒（FORBIDDEN），MANAGER 通过。"""
+    admin_token = await _login(client)
+    op_token = await _login(client, "op01", "op123")
+    mgr_token = await _login(client, "sup01", "sup123")
+    sku_id, _ = await _ids(session)
+
+    created = await client.post(
+        "/api/v1/inbound-orders",
+        json={"order_type": "PO", "lines": [{"sku_id": sku_id, "qty_required": 10}]},
+        headers=_auth(admin_token),
+    )
+    order = created.json()
+
+    # OPERATOR 取消 → 403 FORBIDDEN
+    denied = await client.post(
+        f"/api/v1/inbound-orders/{order['id']}/cancel", headers=_auth(op_token)
+    )
+    assert denied.status_code == 403
+    assert denied.json()["code"] == "FORBIDDEN"
+
+    # MANAGER 取消 → 200
+    allowed = await client.post(
+        f"/api/v1/inbound-orders/{order['id']}/cancel", headers=_auth(mgr_token)
+    )
+    assert allowed.status_code == 200
+    assert allowed.json()["status"] == "CANCELLED"
+
+
+async def test_update_inbound_line_requires_manager(client, session, clean_all):
+    """改入库明细：OPERATOR 被拒，MANAGER 通过。"""
+    admin_token = await _login(client)
+    op_token = await _login(client, "op01", "op123")
+    mgr_token = await _login(client, "sup01", "sup123")
+    sku_id, _ = await _ids(session)
+
+    created = await client.post(
+        "/api/v1/inbound-orders",
+        json={"order_type": "PO", "lines": [{"sku_id": sku_id, "qty_required": 10}]},
+        headers=_auth(admin_token),
+    )
+    order = created.json()
+    line_id = order["lines"][0]["id"]
+
+    # OPERATOR 改明细 → 403 FORBIDDEN
+    denied = await client.patch(
+        f"/api/v1/inbound-orders/{order['id']}/lines/{line_id}",
+        json={"qty_required": 20},
+        headers=_auth(op_token),
+    )
+    assert denied.status_code == 403
+    assert denied.json()["code"] == "FORBIDDEN"
+
+    # MANAGER 改明细 → 200
+    allowed = await client.patch(
+        f"/api/v1/inbound-orders/{order['id']}/lines/{line_id}",
+        json={"qty_required": 20},
+        headers=_auth(mgr_token),
+    )
+    assert allowed.status_code == 200
+    assert allowed.json()["qty_required"] == 20
+
+
+async def test_cancel_outbound_requires_manager(client, session, clean_all):
+    """取消出库单：OPERATOR 被拒，MANAGER 通过。"""
+    admin_token = await _login(client)
+    op_token = await _login(client, "op01", "op123")
+    mgr_token = await _login(client, "sup01", "sup123")
+    sku_id, _ = await _ids(session)
+
+    created = await client.post(
+        "/api/v1/outbound-orders",
+        json={"order_type": "SALE", "lines": [{"sku_id": sku_id, "qty_required": 10}]},
+        headers=_auth(admin_token),
+    )
+    order = created.json()
+
+    denied = await client.post(
+        f"/api/v1/outbound-orders/{order['id']}/cancel", headers=_auth(op_token)
+    )
+    assert denied.status_code == 403
+    assert denied.json()["code"] == "FORBIDDEN"
+
+    allowed = await client.post(
+        f"/api/v1/outbound-orders/{order['id']}/cancel", headers=_auth(mgr_token)
+    )
+    assert allowed.status_code == 200
+    assert allowed.json()["status"] == "CANCELLED"
+
+
 async def test_allocate_prefers_earliest_expiry(client, session, clean_all):
     """FEFO：两个批次都有货时，必须优先出效期早的那个。"""
     token = await _login(client)
@@ -456,6 +593,51 @@ async def test_allocate_prefers_earliest_expiry(client, session, clean_all):
     )
     assert allocated.status_code == 200, allocated.text
     assert allocated.json()["lines"][0]["batch_no"] == "B-EARLY"
+
+
+async def test_allocate_skips_expired_batch(client, session, clean_all):
+    """过期批次不得参与分配：即使它是效期最早的，也必须跳过选下一批。"""
+    token = await _login(client)
+    sku_id, locs = await _ids(session)
+
+    # 过期批次（效期最早）+ 未过期批次
+    await _seed_stock(session, sku_id, locs[STORAGE], "B-EXPIRED", "2025-01-01", 100)
+    await _seed_stock(session, sku_id, locs[STORAGE], "B-FRESH", "2027-06-01", 100)
+
+    created = await client.post(
+        "/api/v1/outbound-orders",
+        json={"order_type": "SALE", "lines": [{"sku_id": sku_id, "qty_required": 10}]},
+        headers=_auth(token),
+    )
+    order = created.json()
+
+    allocated = await client.post(
+        f"/api/v1/outbound-orders/{order['id']}/allocate", headers=_auth(token)
+    )
+    assert allocated.status_code == 200, allocated.text
+    # 关键：不能选中过期的 B-EXPIRED，必须跳过它选中 B-FRESH
+    assert allocated.json()["lines"][0]["batch_no"] == "B-FRESH"
+
+
+async def test_allocate_expired_only_returns_insufficient(client, session, clean_all):
+    """只有过期批次时：应报库存不足，而不是把过期货发出去。"""
+    token = await _login(client)
+    sku_id, locs = await _ids(session)
+
+    await _seed_stock(session, sku_id, locs[STORAGE], "B-EXPIRED", "2025-01-01", 100)
+
+    created = await client.post(
+        "/api/v1/outbound-orders",
+        json={"order_type": "SALE", "lines": [{"sku_id": sku_id, "qty_required": 10}]},
+        headers=_auth(token),
+    )
+    order = created.json()
+
+    allocated = await client.post(
+        f"/api/v1/outbound-orders/{order['id']}/allocate", headers=_auth(token)
+    )
+    assert allocated.status_code == 409
+    assert allocated.json()["code"] == "INVENTORY_INSUFFICIENT"
 
 
 async def test_short_pick_releases_full_allocation(client, session, clean_all):
@@ -523,7 +705,7 @@ async def test_agent_header_recorded_in_txn(client, session, clean_all):
                 "select source, agent_run_id from stock_txn "
                 "where txn_no = :no"
             ),
-            {"no": f"RECEIPT-{order['id']}-{order['lines'][0]['id']}"},
+            {"no": f"RECEIPT-{order['id']}-{order['lines'][0]['id']}-1"},
         )
     ).first()
     assert row is not None

@@ -15,7 +15,7 @@ Sprint 1 的明确简化（必须知道，否则会误解系统行为）：
 
 from dataclasses import dataclass
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Inventory, Location
@@ -45,6 +45,11 @@ async def find_fefo_allocation(
 
     只看 STORAGE 位的货 —— RECEIVING（待上架）和 STAGING（待发运）的货
     不能被新订单分配走，否则会把已经属于别的单的货重复占掉。
+
+    FEFO 之外还有一条硬约束：**过期批次不参与分配**。
+    FEFO 的目标是「减少过期损失」，若把已过期的批次也发出去，就完全背离了
+    设计意图，还会让客户收到过期商品。所以这里用 `expiry_date >= current_date`
+    排除过期批次（哨兵 9999-12-30 永远满足，非批次商品不受影响）。
     """
     stmt = (
         select(Inventory, Location)
@@ -52,6 +57,7 @@ async def find_fefo_allocation(
         .where(
             Inventory.sku_id == sku_id,
             Inventory.qty_available > 0,
+            Inventory.expiry_date >= func.current_date(),
             Location.location_type == "STORAGE",
             Location.status == 1,
         )
