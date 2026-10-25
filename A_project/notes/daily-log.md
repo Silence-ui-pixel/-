@@ -147,3 +147,25 @@
 - A 进 P1：把 24 条接口落到 FastAPI 路由
 
 ---
+
+## 2026-10-25 (D1 · P1 第 1 批完成)
+
+**推进**
+- 实现 9 条接口：认证（login/users/me）、主数据（skus/locations）、库存读（inventory/stock-txn/recon）
+- 补全 ORM 模型字段（Sku/Location/AppUser 完整字段）+ 新增 Pydantic schema 层
+- 种子账号换真实 bcrypt 哈希（admin/admin123、sup01/sup123、op01/op123）
+- 对账接口按角色鉴权（MANAGER/ADMIN）
+- 18 个测试全绿（3 health + 4 apply_txn + 11 接口）
+
+**踩坑**
+- asyncpg 跨事件循环报 "Event loop is closed" → pytest 改 session 级循环（asyncio_default_*_loop_scope = "session"）
+- JWT 密钥太短报警告 → 加长到 32 字节以上
+
+**卡点**
+- git push 因代理 502 暂时失败，本地已 commit（399dd1f），网络恢复后补 push
+
+**明天第一步**
+- 补 push（网络恢复后）
+- P1 第 2 批：单据 CRUD（入库/出库的列表/建单/详情/改明细/取消）
+
+---
