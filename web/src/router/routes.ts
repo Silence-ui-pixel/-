@@ -279,6 +279,19 @@ export const routes: AppRouteRecord[] = [
           roles: ['ADMIN', 'MANAGER', 'OPERATOR', 'VIEWER'],
         },
       },
+      {
+        // PDA 入库作业：收货（B5）+ 上架（B6）
+        path: 'inbound',
+        name: 'pda-inbound',
+        component: () => import('@/views/pda/inbound/index.vue'),
+        meta: {
+          title: '入库作业',
+          icon: 'Download',
+          layout: 'pda',
+          keepAlive: false,
+          roles: ['ADMIN', 'MANAGER', 'OPERATOR'],
+        },
+      },
     ],
   },
 
