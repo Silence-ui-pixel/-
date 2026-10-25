@@ -1,13 +1,13 @@
 # A 成员进度看板（实时更新）
 
 > 每次完成一个任务，本文件会立即更新。看这个就知道「现在到哪一步了」。
-> 更新时间：**2026-10-25 18:47**
+> 更新时间：**2026-10-25 20:05**
 
 ---
 
 ## 📍 当前进度一句话
 
-🎉 **P1 全部完成（4 批 27 条接口全部落地，55 测试全绿）。** A 的后端最小闭环已完整可用，下一步进入联调 + D3 评审。
+🎉 **P1 完成 + 首轮联调已修完 B 反馈的问题（64 测试全绿）。** 错误响应格式已全量对齐契约，`InventoryItem` 补了 `spec`；现在只差 B 确认两件事（`detail` 用 `{}`、库存页默认 6 列），签完 D3 即可冻结契约。
 
 ---
 
@@ -29,6 +29,69 @@
 | 12 | **P1 第 4 批：商品增改 + AI 占位** | ✅ | 10-25 | 2 写接口 + 3 个 501 占位 |
 | 13 | 代码推送到 GitHub `origin/main` | ✅ | 10-25 | `7cfa27e` 已上远程，本地/远程完全一致 |
 | 14 | 核查 B 的推送是否到达远程 | ⚠️ 待 B 确认 | 10-25 | 远程 main 最新仍为 `3305133`，未见 B 新提交 |
+| 15 | **修 B 反馈：错误响应格式统一** | ✅ | 10-25 | 两个异常处理器 + `HTTP_STATUS_TO_CODE`，401/403/404/422 全部转契约结构 |
+| 16 | **`InventoryItem` 补 `spec` 字段** | ✅ | 10-25 | 库存页可显示规格；契约/schema/路由三处同步 |
+| 17 | 首轮联调问题全部闭环 | ✅ | 10-25 | 64 测试全绿；真实 HTTP 6 场景逐个验证 |
+
+---
+
+## 🔧 本轮修复详情（B 联调反馈驱动）
+
+**B 的报告**：`A_project/with_B/B-联调反馈-错误响应格式.md`
+**我的回复**：`A_project/with_B/A-回复-错误格式已修复.md`（可直接发给他）
+
+### 问题本质
+
+只有 `DomainError`（业务错误）走了契约格式，FastAPI 内置的 3 类异常仍是默认 `{detail}`：
+
+| 异常来源 | 修复前 | 修复后 |
+|---|---|---|
+| `DomainError` | ✅ 契约格式 | 不变 |
+| `HTTPException` | ❌ `{detail}` | ✅ `{code, message, detail}` |
+| `RequestValidationError` | ❌ `{detail: [...]}` | ✅ `VALIDATION_ERROR` + `detail.errors` |
+
+### 关键决策：`detail` 用 `{}` 不是 `null`
+
+B 建议写 `detail: None`，**我没照做** —— `contracts/openapi.yaml` 里 `detail` 声明为 `type: object` 且无 `nullable`，返回 `null` 会违反契约，前端若做 schema 校验会直接炸。统一给 `{}`，前端可以永远 `err.detail ?? {}`。
+
+### 改动文件
+
+| 文件 | 改动 |
+|---|---|
+| `api/app/main.py` | 加 `StarletteHTTPException` + `RequestValidationError` 两个处理器；**保留原异常 headers**（401 的 `WWW-Authenticate` 不能丢） |
+| `api/app/core/errors.py` | 加 `HTTP_STATUS_TO_CODE` 映射表（11 个状态码）+ `clean_validation_errors()`（洗掉 Pydantic 里不可序列化的 `ctx.error` / `bytes input`） |
+| `api/app/schemas/__init__.py` | `InventoryItem` 加 `spec: str \| None` |
+| `api/app/api/v1/inventory.py` | 查询带出 `sku.spec` |
+| `contracts/openapi.yaml` | `InventoryItem.spec`（`nullable: true`） |
+| `contracts/errors.md` | 补 7 个通用码 + 422 detail 结构 + 三处理器对照表 |
+| `scripts/dev.sh` | `up` 后检测 `app_user` 表，缺表提示跑 `db-init` |
+| `api/tests/test_error_format.py` | **新增 8 个测试**守护错误格式 |
+
+### 两个隐蔽坑（值得记住）
+
+1. **Pydantic 的 `ctx` 可能塞着 `ValueError` 实例、`input` 可能是 `bytes`** → 直接 `JSONResponse` 会抛 "not JSON serializable" 变成 500，把「参数错了」误导成「服务器崩了」。`clean_validation_errors()` 统一转成原始类型。
+2. **`detail` 类型必须与契约一致** → 这是「契约唯一真源」原则的实战检验：B 的建议在语义上合理，但在契约上非法，不能照抄。
+
+### 验证结果
+
+真实 HTTP 逐场景抓包（非仅单测）：
+
+| # | 场景 | 实际返回 |
+|---|---|---|
+| ① | 登录密码错 | `{"code":"UNAUTHORIZED","message":"用户名或密码错误","detail":{}}` |
+| ② | 未带 token | `{"code":"UNAUTHORIZED","message":"缺少认证信息","detail":{}}` |
+| ③ | OPERATOR 查对账 | `{"code":"FORBIDDEN","message":"需要仓管主管及以上权限","detail":{}}` |
+| ④ | 入库单 999999 | `{"code":"NOT_FOUND","message":"入库单不存在","detail":{}}` |
+| ⑤ | 建单缺 lines | `{"code":"VALIDATION_ERROR","detail":{"errors":[{"loc":["body","lines"],...}]}}` |
+| ⑥ | 库存不足（对照） | `{"code":"INVENTORY_INSUFFICIENT","detail":{...完整 8 字段}}` |
+
+**测试统计**：55 → **64 个全绿**（+8 错误格式 +1 spec 字段）。
+**契约校验**：OpenAPI 3.1 `validate()` 通过，23 条路径。
+
+### 等 B 回的两件事
+
+1. `detail` 用 `{}` 还是 `null`（我坚持 `{}`，除非他有强需求）
+2. 库存查询页默认 6 列是否确认（`sku_code / sku_name / spec / location_code / batch_no+expiry_date / qty_available`）→ 确认后 **D3 契约冻结**
 
 ---
 
@@ -116,7 +179,9 @@ git remote set-url origin git@github.com:Silence-ui-pixel/-.git
 
 1. **D3 模型评审 + 契约冻结**（两人同场，30 分钟）
    材料全齐：8 张表、接口清单、apply_txn 用例、B 的线框图、A 的审查结论。
-   只剩一个待定项：「库存查询页默认显示哪几列」。
+   最后一个待定项已从「哪几列」变成「确认还是调整」：A 已给出 **6 列方案**
+   （`sku_code / sku_name / spec / location_code / batch_no+expiry_date / qty_available`），
+   B 回一句确认即可冻结契约。
 2. **与 B 联调**：B 的 MSW Mock 已就绪，可切真实 API 对拍
    - 需要 `X-Agent-Run-Id` / `Idempotency-Key` 两个头，B 前端要带上（契约已定义）
    - 错误码文案直接用 `contracts/errors.md`
