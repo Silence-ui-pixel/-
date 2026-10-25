@@ -1,7 +1,7 @@
 # A 成员进度看板（实时更新）
 
 > 每次完成一个任务，本文件会立即更新。看这个就知道「现在到哪一步了」。
-> 更新时间：**2026-10-25 21:00**
+> 更新时间：**2026-10-25 21:10**
 
 ---
 
@@ -34,6 +34,7 @@
 | 17 | 首轮联调问题全部闭环 | ✅ | 10-25 | 64 测试全绿；真实 HTTP 6 场景逐个验证 |
 | 18 | **S1-01/02/03 材料准备** | ✅ 材料已备 | 10-25 | 调研包 + 范围声明 + 指标矩阵（3 份，见下） |
 | 19 | **D3 模型评审 + 契约冻结** | ✅ **已冻结 v1.0** | 10-25 | 决议 + 冻结声明 + CHANGELOG + tag `contract-v1.0` |
+| 20 | **P2 启动准备：AI 治理设计** | ✅ 设计就绪 | 10-25 | `drafts/P2-AI治理设计与启动准备.md` + `agent.py` 注释升级为 5 条红线 |
 
 ---
 
@@ -211,7 +212,25 @@ git remote set-url origin git@github.com:Silence-ui-pixel/-.git
    - **`inventory` 表没有 `created_at`**，只有 `updated_at`（写呆滞率 SQL 时会踩）
 
    **指标 SQL 全部实跑验证过**，抓出 2 个错误（`percentile_cont` 需 `::numeric`；`inventory` 无 `created_at`）。
-4. **P2 启动准备**：AI 接口的治理设计已在 `agent.py` 注释里写成约束清单
+4. **P2 启动准备** —— ✅ **设计就绪**：`drafts/P2-AI治理设计与启动准备.md`
+
+   **核心主张**：约束写在注释里等于没有约束。所以 5 条红线每条都配有「强制点」——
+   能指出哪一行代码 / 哪一条数据库权限真的拦得住。
+
+   | 红线 | 强制点 |
+   |---|---|
+   | AI 永不写库存 | `apply_txn` 唯一入口 + AI 专用只读 DB 角色（物理隔离） |
+   | 产出只能是建议 | 只能写 `agent_suggestion`，状态默认 PENDING，无建单代码路径 |
+   | 审批必须人触发 | 带 `X-Agent-Run-Id` 调 approve → 403 `AGENT_WRITE_FORBIDDEN`；`approved_by` not null |
+   | 每次调用留痕 | `agent_run` 表 + `stock_txn.agent_run_id`（**Sprint 1 已预留该字段**） |
+   | SQL 必须过白名单 | sqlglot 解析（单条 SELECT + 表白名单 + 强制 LIMIT）→ 只读角色兜底 |
+
+   **新增 2 张表的 DDL 已写好**（`agent_run` / `agent_suggestion`），P2 开工可直接迁移。
+   **9 条攻击用例**已列为验收清单（含 `delete`、CTE 写、多语句、`pg_sleep`、`copy`）。
+   **工作量**：A 约 6 人天，B 约 2 人天。
+
+   ⚠️ **开工前必须定 3 件事**（不写代码但要先定，否则返工）：
+   ① 用哪个模型 API ② AI 允许查哪些表 ③ 审批人是 MANAGER 还是 ADMIN
 
 ### 第 3 批的作业语义速查（面试/交接时讲得清）
 
