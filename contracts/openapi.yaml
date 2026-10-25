@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: 仓储智能管理 Agent 系统 API
-  version: 0.1.0
+  version: 1.0.0        # 2026-10-25 冻结，见 CONTRACT-FREEZE.md
   description: |
     Sprint 1 最小闭环契约（收货 → 上架 → 查询 → 拣货 → 出库）。
     本契约是前后端并行开发的唯一真源：B 据此生成 TS 类型、搭 mock，

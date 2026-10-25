@@ -23,7 +23,7 @@ from app.core.errors import (
 def create_app() -> FastAPI:
     app = FastAPI(
         title="Canku WMS API",
-        version="0.1.0",
+        version="1.0.0",  # 与 contracts/openapi.yaml 一致，2026-10-25 冻结
         description="仓储智能管理 Agent 系统 · 领域与账务服务",
         docs_url="/docs",
         redoc_url=None,
