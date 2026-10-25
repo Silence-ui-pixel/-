@@ -76,9 +76,9 @@ client.use({
       .catch(() => null)
 
     const code: string | undefined = body?.code
-    // 兼容两种错误体：
-    //   1) 契约格式 { code, message, detail }（mock 与目标实现）
-    //   2) FastAPI 默认 { detail: "中文描述" }（当前后端部分接口的实际返回）
+    // 错误体兼容：
+    //   1) 契约格式 { code, message, detail }（后端 2026-10-25 修复后已统一，mock 亦同）
+    //   2) FastAPI 默认 { detail: "中文描述" }（保留兜底，防旧版本/其他服务）
     const rawDetail = body?.detail
     const message: string =
       body?.message ?? (typeof rawDetail === 'string' ? rawDetail : undefined) ?? getErrorMessage(code ?? '')

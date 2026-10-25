@@ -58,6 +58,9 @@
       >
         <el-table-column prop="sku_code" label="SKU 编码" min-width="120" />
         <el-table-column prop="sku_name" label="商品名称" min-width="150" show-overflow-tooltip />
+        <el-table-column label="规格" min-width="120" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.spec || '—' }}</template>
+        </el-table-column>
         <el-table-column prop="location_code" label="库位全码" min-width="130" />
         <el-table-column label="批次" min-width="110">
           <template #default="{ row }">{{ row.batch_no || '—' }}</template>

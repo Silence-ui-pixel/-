@@ -1,5 +1,13 @@
 # B → A 联调反馈：错误响应格式不符合契约
 
+> ## ✅ 已修复（2026-10-25 20:15 验证）
+> A 的 `7a886d2 fix(api): 错误响应统一为契约结构 + InventoryItem 补 spec` 已解决全部问题：
+> - 401/403/404/422 实测均返回 `{code, message, detail}`（UNAUTHORIZED / NOT_FOUND / VALIDATION_ERROR）
+> - `InventoryItem` 已补 `spec` 字段，真实响应含 `"spec":"550ml*24/箱"`
+> - B 侧已重新生成 `schema.d.ts`，库存查询页加回「规格」列，端到端验证通过
+>
+> 本文档保留作历史记录。
+
 > 作者：B · 日期 2026-10-25
 > 背景：本地已起后端（`bash scripts/dev.sh up` + `db-init`），前端以 `VITE_USE_MOCK=false` 直连 127.0.0.1:8000 完成首轮联调。
 > 结论：**正常路径全部通了；只有「非业务异常」的错误响应格式不符合契约，需要修一处。**

@@ -541,6 +541,8 @@ export interface components {
             sku_id?: number;
             sku_code?: string;
             sku_name?: string;
+            /** @description 规格，如 "550ml*24/箱" */
+            spec?: string | null;
             location_id?: number;
             location_code?: string;
             location_type?: string;

@@ -27,11 +27,11 @@ export const locations: S['Location'][] = [
 
 // 库存余额（InventoryItem：已含 sku/location 联表展示字段）
 export const inventoryItems: S['InventoryItem'][] = [
-  { sku_id: 1, sku_code: 'SKU-1001', sku_name: '矿泉水 500ml', location_id: 1, location_code: 'WH01-A-01-01', location_type: 'STORAGE', batch_no: '', expiry_date: '9999-12-31', qty_on_hand: 500, qty_allocated: 50, qty_available: 450, base_uom: 'EA' },
-  { sku_id: 2, sku_code: 'SKU-1002', sku_name: '纯牛奶 250ml', location_id: 2, location_code: 'WH01-A-01-02', location_type: 'STORAGE', batch_no: 'B20260920', expiry_date: '2026-11-20', qty_on_hand: 300, qty_allocated: 120, qty_available: 180, base_uom: 'EA' },
-  { sku_id: 2, sku_code: 'SKU-1002', sku_name: '纯牛奶 250ml', location_id: 2, location_code: 'WH01-A-01-02', location_type: 'STORAGE', batch_no: 'B20261001', expiry_date: '2026-12-01', qty_on_hand: 200, qty_allocated: 0, qty_available: 200, base_uom: 'EA' },
-  { sku_id: 3, sku_code: 'SKU-1003', sku_name: '抽纸 3层', location_id: 3, location_code: 'WH01-B-02-01', location_type: 'STORAGE', batch_no: '', expiry_date: '9999-12-31', qty_on_hand: 800, qty_allocated: 0, qty_available: 800, base_uom: 'EA' },
-  { sku_id: 1, sku_code: 'SKU-1001', sku_name: '矿泉水 500ml', location_id: 4, location_code: 'WH01-R-00-01', location_type: 'RECEIVING', batch_no: 'B20261025', expiry_date: '9999-12-31', qty_on_hand: 200, qty_allocated: 0, qty_available: 200, base_uom: 'EA' },
+  { sku_id: 1, sku_code: 'SKU-1001', sku_name: '矿泉水 500ml', spec: '24瓶/箱', location_id: 1, location_code: 'WH01-A-01-01', location_type: 'STORAGE', batch_no: '', expiry_date: '9999-12-30', qty_on_hand: 500, qty_allocated: 50, qty_available: 450, base_uom: 'EA' },
+  { sku_id: 2, sku_code: 'SKU-1002', sku_name: '纯牛奶 250ml', spec: '16盒/箱', location_id: 2, location_code: 'WH01-A-01-02', location_type: 'STORAGE', batch_no: 'B20260920', expiry_date: '2026-11-20', qty_on_hand: 300, qty_allocated: 120, qty_available: 180, base_uom: 'EA' },
+  { sku_id: 2, sku_code: 'SKU-1002', sku_name: '纯牛奶 250ml', spec: '16盒/箱', location_id: 2, location_code: 'WH01-A-01-02', location_type: 'STORAGE', batch_no: 'B20261001', expiry_date: '2026-12-01', qty_on_hand: 200, qty_allocated: 0, qty_available: 200, base_uom: 'EA' },
+  { sku_id: 3, sku_code: 'SKU-1003', sku_name: '抽纸 3层', spec: '10包/提', location_id: 3, location_code: 'WH01-B-02-01', location_type: 'STORAGE', batch_no: '', expiry_date: '9999-12-30', qty_on_hand: 800, qty_allocated: 0, qty_available: 800, base_uom: 'EA' },
+  { sku_id: 1, sku_code: 'SKU-1001', sku_name: '矿泉水 500ml', spec: '24瓶/箱', location_id: 4, location_code: 'WH01-R-00-01', location_type: 'RECEIVING', batch_no: 'B20261025', expiry_date: '9999-12-30', qty_on_hand: 200, qty_allocated: 0, qty_available: 200, base_uom: 'EA' },
 ]
 
 // 库存流水
