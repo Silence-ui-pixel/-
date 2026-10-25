@@ -169,3 +169,21 @@
 - P1 第 2 批：单据 CRUD（入库/出库的列表/建单/详情/改明细/取消）
 
 ---
+
+## 2026-10-25 (D1 · P1 第 2 批完成)
+
+**推进**
+- 实现入库单 CRUD（列表/建单/详情/改明细/取消）+ 出库单 CRUD（列表/建单/详情/取消）
+- 补全 InboundOrder/OutboundOrder/OrderLine 三个 ORM 模型 + 单据 Pydantic schema
+- 明细 join sku 带出 sku_code/sku_name；订单号 IN/OUT-日期-随机串
+- 31 个测试全绿（新增 13 个单据 CRUD 测试）
+
+**踩坑（2 个真实缺陷，都值得记）**
+1. **`order_line.order_type` 是 `char(2)` 但取值 `OUT` 是 3 字符**，插入直接报 value too long。原 schema 笔误。改成 char(3)/String(3)，schema.sql + alembic 迁移 + 模型三处同步
+2. **`SentinelDate` 的 bind_expression+case 在多列 INSERT 时触发 SQLAlchemy 编译器断言崩溃**。之前 apply_txn 测试单列绑定能过、建单多列就崩。彻底改用更稳方案：哨兵日期统一为 `9999-12-30`（date.max 会被 asyncpg 映射成 infinity 导致唯一约束维度错配，9999-12-30 是 asyncpg 能正常编码的等价最大安全日期），删掉整个类型装饰器
+
+**明天第一步**
+- 补 push（网络恢复后）
+- P1 第 3 批（核心）：收货 B5 / 上架 B6 / 分配 O4 / 拣货 O5 / 发运 O6，全部走 apply_txn
+
+---
