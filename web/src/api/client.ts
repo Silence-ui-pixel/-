@@ -2,12 +2,17 @@
 // 统一请求入口（基于 openapi-fetch）
 // -----------------------------------------------------------------------------
 // - `client`：强类型请求客户端，类型来自 src/api/schema.d.ts 的 `paths`（契约唯一真源）。
-//   所有接口方法（GET/POST/PUT/PATCH）都由 openapi-fetch 按契约自动推导，字段严格 snake_case。
 // - 全局拦截（middleware）：
-//     1) 请求头注入 `Authorization: Bearer <token>`；
-//     2) 写操作（POST/PUT/PATCH）自动注入 `Idempotency-Key` 幂等头（PDA 弱网重试必需，
-//        业务层可显式传更精确的幂等键，如 `SO-001-PICK`）；
-//     3) 非 2xx 响应统一转成 `ApiError`（message 已是中文文案），调用层 catch 后可直接弹窗。
+//     1) onRequest：只注入 `Authorization: Bearer <token>`；
+//     2) onResponse：401 → 清凭证并跳登录；其余非 2xx → 统一转 `ApiError`（中文文案）。
+//
+// ⚠️ 幂等键（Idempotency-Key）**不在这里自动生成**。
+//    原因（A 的开发约定）：每次请求新生成 key = 重试时 key 变了 = 等于没有幂等。
+//    正确做法：业务层在「用户点击那一刻」调 `makeIdempotencyKey(orderNo, action)` 生成一次，
+//    存组件状态；重试时**复用同一个 key**。
+// -----------------------------------------------------------------------------
+// ⚠️ `X-Agent-Run-Id` 也**不在全局拦截器里塞**：只有 AI 发起的写操作才显式传，
+//    否则所有人类操作都会被审计成 source=AGENT。
 // =============================================================================
 
 import createClient from 'openapi-fetch'
@@ -19,6 +24,7 @@ const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000/api
 
 /** 与 auth store 保持一致 */
 const TOKEN_KEY = 'wms_token'
+const USER_KEY = 'wms_user'
 
 /**
  * 统一业务异常：message 已是「可直接弹窗」的中文文案。
@@ -42,53 +48,62 @@ export class ApiError extends Error {
 export const client = createClient<paths>({ baseUrl: BASE_URL })
 
 // ---------------------------------------------------------------------------
-// 全局拦截 1：注入 token + 幂等头
+// 全局拦截 1：只注入 token（不碰幂等键 / Agent 头）
 // ---------------------------------------------------------------------------
 client.use({
   async onRequest({ request }) {
     const token = localStorage.getItem(TOKEN_KEY)
-    if (token) {
-      request.headers.set('Authorization', `Bearer ${token}`)
-    }
-
-    // 写操作注入幂等头（PDA 弱网重试时同一次业务提交用同一个 key，避免重复扣减）
-    const method = request.method.toUpperCase()
-    if (method === 'POST' || method === 'PUT' || method === 'PATCH') {
-      if (!request.headers.has('Idempotency-Key')) {
-        request.headers.set('Idempotency-Key', genIdempotencyKey())
-      }
-    }
+    if (token) request.headers.set('Authorization', `Bearer ${token}`)
     return request
   },
 })
 
 // ---------------------------------------------------------------------------
-// 全局拦截 2：非 2xx → 统一转 ApiError（中文文案）
+// 全局拦截 2：401 → 清凭证跳登录；其余非 2xx → ApiError
 // ---------------------------------------------------------------------------
 client.use({
   async onResponse({ response }) {
     if (response.ok) return response
 
-    // 此时 body 尚未被 openapi-fetch 消费，clone 一份安全读取，不破坏后续解析
-    const body = await response
-      .clone()
-      .json()
-      .catch(() => null)
-
+    // body 尚未被 openapi-fetch 消费，clone 一份安全读取
+    const body = await response.clone().json().catch(() => null)
     const code: string | undefined = body?.code
-    // 错误体兼容：
-    //   1) 契约格式 { code, message, detail }（后端 2026-10-25 修复后已统一，mock 亦同）
-    //   2) FastAPI 默认 { detail: "中文描述" }（保留兜底，防旧版本/其他服务）
-    const rawDetail = body?.detail
-    const message: string =
-      body?.message ?? (typeof rawDetail === 'string' ? rawDetail : undefined) ?? getErrorMessage(code ?? '')
+    const message: string = body?.message ?? getErrorMessage(code ?? '')
+
+    // 401 会话失效：清凭证并跳登录（跳转本身即反馈，不再额外弹 toast）
+    // 注意：登录页自身的 401（密码错）不跳转，避免死循环
+    if (response.status === 401) {
+      localStorage.removeItem(TOKEN_KEY)
+      localStorage.removeItem(USER_KEY)
+      if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+        window.location.replace('/login')
+      }
+    }
+
     throw new ApiError(code, message, body?.detail, response.status)
   },
 })
 
-/** 生成默认幂等键（业务层可显式覆盖，传更可读的 `业务单号-动作`） */
-function genIdempotencyKey(): string {
-  return `idem-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+/**
+ * 生成幂等键：业务标识 + 动作 + UUID。
+ *
+ * **必须**在「用户点击那一刻」调用一次，把结果存进组件状态；重试时复用同一个 key。
+ * 每次重试重新生成 = 幂等失效（后端会当成新请求）。
+ *
+ * @example
+ * const key = makeIdempotencyKey(order.order_no, 'RECEIVE')
+ * await client.POST('/inbound-orders/{id}/receive', {
+ *   params: { path: { id }, header: { 'Idempotency-Key': key } },
+ *   body,
+ * })
+ * // 失败重试时仍是这个 key
+ */
+export function makeIdempotencyKey(orderNo: string, action: string): string {
+  const uuid =
+    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+  return `${orderNo}-${action}-${uuid}`
 }
 
 /**
