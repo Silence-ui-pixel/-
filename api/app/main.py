@@ -1,7 +1,15 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
-from app.api.v1 import auth, health, inbound_orders, inventory, outbound_orders, skus
+from app.api.v1 import (
+    agent,
+    auth,
+    health,
+    inbound_orders,
+    inventory,
+    outbound_orders,
+    skus,
+)
 from app.core.config import settings
 from app.core.errors import DomainError
 
@@ -43,6 +51,7 @@ def create_app() -> FastAPI:
     app.include_router(
         outbound_orders.router, prefix=settings.api_prefix, tags=["outbound"]
     )
+    app.include_router(agent.router, prefix=settings.api_prefix, tags=["agent"])
 
     return app
 

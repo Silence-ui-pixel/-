@@ -36,6 +36,28 @@ class NotFound(DomainError):
         super().__init__(code="NOT_FOUND", message=message, detail=detail)
 
 
+class Conflict(DomainError):
+    """业务冲突（唯一键重复、状态互斥等）。"""
+
+    status_code = 409
+
+    def __init__(self, code: str, message: str, detail: dict | None = None):
+        super().__init__(code=code, message=message, detail=detail)
+
+
+class NotImplementedYet(DomainError):
+    """接口已定义但本阶段未实现（契约占位，返回 501）。
+
+    用 501 而不是 404：明确告诉调用方「这个接口存在，只是还没做」，
+    前端可以据此显示「功能开发中」而不是「接口不存在」。
+    """
+
+    status_code = 501
+
+    def __init__(self, message: str = "该功能将在 P2 阶段实现", detail: dict | None = None):
+        super().__init__(code="NOT_IMPLEMENTED", message=message, detail=detail)
+
+
 class InvalidStatusTransition(DomainError):
     """单据状态机不允许的流转（如 DONE 之后再收货）。
 

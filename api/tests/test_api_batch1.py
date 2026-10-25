@@ -93,13 +93,21 @@ async def test_list_locations(client):
 # 库存读
 # ---------------------------------------------------------------------------
 async def test_list_inventory(client):
+    """库存查询接口：结构与字段正确即可。
+
+    刻意不断言「至少有一条库存」—— 库存是测试过程中会被其他用例
+    TRUNCATE 又重建的可变状态，让本用例依赖它会让测试之间产生顺序耦合，
+    换一个执行顺序就红。库存内容正确性由第 3 批的全链路测试保证。
+    """
     token = await _login(client)
     resp = await client.get("/api/v1/inventory", headers={"Authorization": f"Bearer {token}"})
     assert resp.status_code == 200
     data = resp.json()
-    assert "items" in data
-    # 种子数据里有 1 条期初库存
-    assert data["meta"]["total"] >= 1
+    assert isinstance(data["items"], list)
+    assert {"total", "page", "page_size"} <= set(data["meta"])
+    # 有数据时校验字段完整（没数据也算通过）
+    for item in data["items"]:
+        assert {"sku_code", "location_code", "qty_on_hand", "qty_available"} <= set(item)
 
 
 async def test_list_stock_txn(client):

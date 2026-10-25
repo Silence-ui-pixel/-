@@ -5,6 +5,7 @@
 """
 
 from datetime import date, datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
@@ -64,6 +65,42 @@ class Sku(ORMModel):
 class SkuListResponse(BaseModel):
     items: list[Sku]
     meta: PageMeta
+
+
+class SkuCreate(BaseModel):
+    """新建商品。sku_code 与 name 必填，其余取默认值。"""
+
+    sku_code: str
+    barcode: str | None = None
+    name: str
+    spec: str | None = None
+    category: str | None = None
+    base_uom: str = "EA"
+    weight_kg: float | None = None
+    volume_m3: float | None = None
+    shelf_life_days: int | None = None
+    abc_class: Literal["A", "B", "C"] | None = None
+    is_batch_managed: bool = False
+    safety_stock: float = 0
+    reorder_point: float = 0
+
+
+class SkuUpdate(BaseModel):
+    """修改商品。字段全部可选，只更新客户端明确提供的字段。
+
+    没有 sku_code / barcode：编码是主数据标识，改了会让历史单据指向错货；
+    条码属包装属性，变更需要单独流程（本次契约未开放）。
+    """
+
+    name: str | None = None
+    spec: str | None = None
+    category: str | None = None
+    base_uom: str | None = None
+    shelf_life_days: int | None = None
+    abc_class: Literal["A", "B", "C"] | None = None
+    is_batch_managed: bool | None = None
+    safety_stock: float | None = None
+    reorder_point: float | None = None
 
 
 # ---------- 库位 ----------
@@ -293,3 +330,27 @@ class PickLine(BaseModel):
 
 class PickPlanResponse(BaseModel):
     lines: list[PickLine]
+
+
+# ---------- AI Agent（P2 实现，本期 501 占位） ----------
+# 放在文件末尾是因为 AgentQueryResponse 引用 InventoryItem，
+# Python 类定义顺序执行，引用必须先定义。
+class AgentQueryRequest(BaseModel):
+    query: str
+
+
+class AgentQueryResponse(BaseModel):
+    answer: str
+    sql_summary: str | None = None
+    data: list[InventoryItem] = []
+
+
+class AgentSuggestion(BaseModel):
+    id: int
+    type: Literal["REPLENISH", "TRANSFER"]
+    status: Literal["PENDING", "APPROVED", "REJECTED"]
+    sku_id: int
+    sku_code: str
+    suggested_qty: float
+    reason: str | None = None
+    created_at: datetime
