@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 
-from app.api.v1 import health
+from app.api.v1 import auth, health, inventory, skus
 from app.core.config import settings
 
 
@@ -14,12 +14,12 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(health.router, prefix=settings.api_prefix, tags=["system"])
+    app.include_router(auth.router, prefix=settings.api_prefix, tags=["auth"])
+    app.include_router(skus.router, prefix=settings.api_prefix, tags=["sku", "location"])
+    app.include_router(inventory.router, prefix=settings.api_prefix, tags=["inventory"])
 
-    # 业务路由按模块挂载（Sprint 1 后续），示例：
-    #   app.include_router(sku.router, prefix=f"{settings.api_prefix}/skus")
-    #   app.include_router(
-    #       inventory.router, prefix=f"{settings.api_prefix}/inventory"
-    #   )
+    # 后续模块（入库/出库/agent）按契约逐步挂载：
+    #   app.include_router(inbound.router, prefix=f"{settings.api_prefix}/inbound-orders")
     # 每个模块的路由必须与 contracts/openapi.yaml 一致，
     # 不允许先写接口后补契约。
 

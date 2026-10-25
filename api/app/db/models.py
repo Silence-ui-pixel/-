@@ -17,7 +17,9 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Identity,
+    Integer,
     Numeric,
+    SmallInteger,
     String,
     func,
     literal_column,
@@ -59,7 +61,9 @@ class AppUser(Base):
     id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
     username: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
     display_name: Mapped[str] = mapped_column(String(64), nullable=False)
+    password_hash: Mapped[str] = mapped_column(String(200), nullable=False)
     role: Mapped[str] = mapped_column(String(16), nullable=False, default="OPERATOR")
+    status: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=1)
 
 
 class Sku(Base):
@@ -67,17 +71,50 @@ class Sku(Base):
 
     id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
     sku_code: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    barcode: Mapped[str | None] = mapped_column(String(64), nullable=True)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
+    spec: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    category: Mapped[str | None] = mapped_column(String(64), nullable=True)
     base_uom: Mapped[str] = mapped_column(String(16), nullable=False, default="EA")
+    weight_kg: Mapped[float | None] = mapped_column(Numeric(10, 3), nullable=True)
+    volume_m3: Mapped[float | None] = mapped_column(Numeric(12, 6), nullable=True)
+    shelf_life_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    abc_class: Mapped[str | None] = mapped_column(String(1), nullable=True)
     is_batch_managed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    safety_stock: Mapped[float] = mapped_column(Numeric(14, 3), nullable=False, default=0)
+    reorder_point: Mapped[float] = mapped_column(Numeric(14, 3), nullable=False, default=0)
+    status: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=1)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
 
 
 class Location(Base):
     __tablename__ = "location"
 
     id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    warehouse_code: Mapped[str] = mapped_column(String(32), nullable=False, default="WH01")
+    zone_code: Mapped[str] = mapped_column(String(32), nullable=False)
+    rack_code: Mapped[str] = mapped_column(String(32), nullable=False)
+    level_no: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=1)
+    bin_code: Mapped[str] = mapped_column(String(32), nullable=False)
     location_code: Mapped[str] = mapped_column(String(96), unique=True, nullable=False)
     location_type: Mapped[str] = mapped_column(String(16), nullable=False, default="STORAGE")
+    pick_seq: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    capacity_qty: Mapped[float | None] = mapped_column(Numeric(14, 3), nullable=True)
+    capacity_volume: Mapped[float | None] = mapped_column(Numeric(12, 6), nullable=True)
+    is_mixed_sku: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    is_mixed_batch: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    status: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=1)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
 
 
 class Inventory(Base):

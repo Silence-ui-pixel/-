@@ -19,6 +19,10 @@ dependencies = [
   "alembic>=1.13",
   # alembic 走同步引擎，需要同步驱动；业务层用 asyncpg，两者并存
   "psycopg[binary]>=3.2",
+  # JWT 签发与校验（登录认证）
+  "pyjwt>=2.8",
+  # 密码哈希（种子账号用 bcrypt 格式）
+  "bcrypt>=4.2",
 ]
 
 [project.optional-dependencies]
@@ -65,5 +69,7 @@ extend-immutable-calls = [
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
 testpaths = ["tests"]
 addopts = "-q"

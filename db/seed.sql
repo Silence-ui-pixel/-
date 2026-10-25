@@ -17,11 +17,11 @@
 --   后续接入 alembic 时，迁移只覆盖 DDL，seed 由脚本单独调用。
 -- =============================================================================
 
--- 用户
+-- 用户（开发环境密码：admin/admin123，sup01/sup123，op01/op123）
 insert into app_user (username, display_name, password_hash, role) values
-  ('admin',  '系统管理员', '$2b$12$REPLACE_WITH_REAL_BCRYPT_HASH', 'ADMIN'),
-  ('sup01',  '张主管',     '$2b$12$REPLACE_WITH_REAL_BCRYPT_HASH', 'MANAGER'),
-  ('op01',   '李操作员',   '$2b$12$REPLACE_WITH_REAL_BCRYPT_HASH', 'OPERATOR')
+  ('admin',  '系统管理员', '$2b$12$AktH6N4KqTrK064UGxFzGuBD/Q82z9Fnr5ERz/0M8mBAnYXCo2s.O', 'ADMIN'),
+  ('sup01',  '张主管',     '$2b$12$D.FLruIyjiUfJri9yt9XkOi1NpNkF31OBLcRAZMdcdjyHWlKn5wgq', 'MANAGER'),
+  ('op01',   '李操作员',   '$2b$12$5Z8W3kiy/PQgZnhPrfdgaO7v/ZnC4CMbnZqzi.CsucObNoxyVubNC', 'OPERATOR')
 on conflict (username) do nothing;
 
 -- 库位：A 区 2 货架 x 3 层 x 2 位，加 1 个拣货位 + 1 个收货暂存位
