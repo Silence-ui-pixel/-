@@ -23,6 +23,17 @@ pull 完请确认这 3 处（如果没有，说明没拉到最新）：
 | `db/seed.sql` 库位块 | 编码是 `A0101` / `C0101` 这种，**不是** `WH01-A-01-01-01` |
 | `web/src/views/inventory/index.vue` | 只有 `<router-view />`，不再是那个 42 行占位页 |
 
+### ⚠️ `VITE_USE_MOCK` 已改成 `false`（不再走 Mock）
+
+`web/.env.development` 里我把它从 `true` 改成了 `false` —— 因为后端接口已经全部就绪，试运行要连真实数据。**pull 下来之后你的页面会直接打真实后端（`localhost:8000`），MSW 不再拦截。**
+
+这会带来两个变化，心里有数就行：
+
+1. **没接后端的地方会真的报错**（以前 Mock 兜住了）。如果你正在写的页面还需要假数据过渡，本地临时改回 `true` 就行，**但提交前请改回 `false`**，别把它推到远程。
+2. **登录必须用真实账号**：`admin/admin123`、`sup01/sup123`、`op01/op123`。Mock 里那套假 token 不再生效。
+
+> 另外 `web/package-lock.json` 我一起提交了，但**只是 npm 版本差异产生的 `peer: true` 标记**，没有增删任何依赖、没改任何版本号。你本地跑 `npm ci` 结果完全一致。
+
 ### 我在你的前端修了 1 个 bug（重要）
 
 `web/src/views/inventory/index.vue` 原来是 42 行的骨架占位页（禁用输入框 + "等待 Mock 就绪"提示）。你把真页面建在 `inventory/query/` 和 `inventory/txn/` 下，但**父组件没改成 `<router-view />`**。
