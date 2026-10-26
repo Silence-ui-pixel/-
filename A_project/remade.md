@@ -208,10 +208,23 @@ B 建议写 `detail: None`，**我没照做** —— `contracts/openapi.yaml` �
 
 ## 🔌 环境坑与网络通道（下次遇到直接查这里）
 
-- GitHub **HTTPS 443 直连不通**（`gitclone.com` 镜像也无法 push），唯一可用通道是 **本地代理 `127.0.0.1:7897`**。
-- 已在仓库级固化：`git config http.proxy http://127.0.0.1:7897`，直接 `git push` / `git pull` 即可。
+- GitHub **HTTPS 443 直连不通**（`gitclone.com` 镜像也无法 push），必须走本地代理。
+- ⚠️ **代理端口会变**：10-25 是 Clash 的 `7897`，10-26 变成 `64484`（Clash 关闭后由 WorkBuddy 会话代理解管）。
+  **不要死记端口**，先跑这条查当前可用值：
+
+  ```bash
+  env | grep -i proxy          # 看 HTTP_PROXY / HTTPS_PROXY 的值
+  curl -s -o /dev/null -w "%{http_code}\n" --max-time 20 -x <上面拿到的代理> https://github.com/
+  # 返回 200 即可用
+  ```
+
+- 推送命令模板（把 `PORT` 换成查到的端口）：
+
+  ```bash
+  git -c http.proxy=http://127.0.0.1:PORT push origin main
+  ```
+
 - `git config --global url....insteadOf` 的镜像改写**已移除**（若恢复会把地址改回 `gitclone.com` 导致推送失败）。
-- 若某天 7897 代理关了，先验证 `curl -x http://127.0.0.1:7897 https://github.com/` 是否 200。
 
 ### Docker Desktop 重启后，旧容器挂载会失效 ⚠️
 
