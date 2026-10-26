@@ -41,6 +41,21 @@ class User(BaseModel):
     role: str
 
 
+class UserListItem(User):
+    """用户列表项：比「当前用户」多一个启用状态。
+
+    用户管理页需要区分启用/停用，否则没法做启用/停用操作。
+    注意：无论哪个 schema 都**不含 password_hash**，密码哈希永不出 API。
+    """
+
+    status: int
+
+
+class UserListResponse(BaseModel):
+    items: list[UserListItem]
+    meta: PageMeta
+
+
 # ---------- 商品 ----------
 class Sku(ORMModel):
     id: int

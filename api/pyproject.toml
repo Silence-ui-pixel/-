@@ -31,6 +31,9 @@ dev = [
   "pytest-asyncio>=0.24",
   "httpx>=0.27",
   "ruff>=0.7",
+  # 契约校验：改完 openapi.yaml 立即验证合法性
+  # 曾经只在容器里 pip install，容器一重建就丢，导致无法校验契约
+  "openapi-spec-validator>=0.7",
 ]
 
 [tool.hatch.build.targets.wheel]

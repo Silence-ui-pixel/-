@@ -87,6 +87,26 @@
 
 ---
 
+## v1.2 — 2026-10-26（状态：已生效）
+
+### 变更 1：新增 `GET /users` 用户列表接口
+
+- **类型**：允许（纯新增，不改已有语义）
+- **提出方**：A（前端 B 的用户管理页被阻塞）
+- **原因**：B 的「用户角色」页面是占位状态，需要一个用户列表接口才能实现。
+  原契约只有 `GET /users/me`（当前用户），没有列表。
+- **影响范围**：
+  - 契约：新增 `/users` 路径 + `UserListItem` / `UserListResponse` 两个 schema
+  - 后端：`auth.py` 新增 `list_users`（分页 + keyword/role 过滤）
+  - 前端：B 可据此实现用户管理页
+- **安全约束（必须守住）**：
+  1. **响应绝不含 `password_hash`** —— 用白名单式 `UserListItem` 序列化，不直接 dump ORM
+  2. **需 MANAGER/ADMIN** —— OPERATOR/VIEWER 返回 403
+- **兼容性**：纯新增，老调用方不受影响
+- **验证**：7 个新测试（含「响应不含 password_hash」安全断言）；全量 70 → **77 passed**
+
+---
+
 ## 模板（新增变更时复制这一段）
 
 ```markdown

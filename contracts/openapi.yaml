@@ -122,6 +122,28 @@ components:
           type: string
           enum: [ADMIN, MANAGER, OPERATOR, VIEWER]
 
+    UserListItem:
+      description: 用户列表项。比 User 多一个 status；任何 User 类型都不含 password_hash。
+      type: object
+      properties:
+        id: { type: integer }
+        username: { type: string }
+        display_name: { type: string }
+        role:
+          type: string
+          enum: [ADMIN, MANAGER, OPERATOR, VIEWER]
+        status:
+          type: integer
+          description: 1 启用 / 0 停用
+
+    UserListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/UserListItem" }
+        meta: { $ref: "#/components/schemas/PageMeta" }
+
     # ---------- 商品 ----------
     Sku:
       type: object
@@ -544,6 +566,39 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/User" }
+
+  /users:
+    get:
+      tags: [auth]
+      summary: 用户分页列表（需 MANAGER/ADMIN，不含密码哈希）
+      operationId: list_users
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: keyword
+          in: query
+          schema: { type: string }
+          description: 对 username / display_name 模糊搜索
+        - name: role
+          in: query
+          schema: { type: string }
+          description: 按角色精确过滤（ADMIN / MANAGER / OPERATOR / VIEWER）
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: page_size
+          in: query
+          schema: { type: integer, default: 20 }
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UserListResponse" }
+        "403":
+          description: 角色不足（需 MANAGER/ADMIN）
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
 
   # ============ 商品 ============
   /skus:
