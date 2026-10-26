@@ -187,7 +187,12 @@ class StockTxnListResponse(BaseModel):
 
 class ReconItem(BaseModel):
     sku_id: int | None = None
+    # 冗余编码字段：对账页要显示「哪个商品在哪个库位不平」，
+    # 只给 id 的话前端必须自己 join 两张列表，且 join 不到时无法排查
+    sku_code: str | None = None
+    sku_name: str | None = None
     location_id: int | None = None
+    location_code: str | None = None
     batch_no: str
     expiry_date: date
     inv_on_hand: float

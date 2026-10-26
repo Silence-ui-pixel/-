@@ -54,9 +54,9 @@ async def base_ids(clean_tables, session):
     assert sku is not None, "种子数据里应有 SKU-1001，先跑 db-init"
 
     r = await session.execute(
-        text("select id from location where location_code = 'WH01-A-01-01-01'")
+        text("select id from location where location_code = 'A0101'")
     )
     loc = r.first()
-    assert loc is not None, "种子数据里应有库位 WH01-A-01-01-01"
+    assert loc is not None, "种子数据里应有库位 A0101"
 
     return {"sku_id": sku.id, "location_id": loc.id, "sku_code": sku.sku_code}

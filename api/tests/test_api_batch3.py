@@ -17,9 +17,9 @@ from sqlalchemy import text
 
 from app.main import app
 
-RECEIVING = "WH01-R-00-01-01"
-STAGING = "WH01-S-00-01-01"
-STORAGE = "WH01-A-01-01-01"
+RECEIVING = "C0101"
+STAGING = "C0201"
+STORAGE = "A0101"
 BATCH = "B-T3-01"
 
 

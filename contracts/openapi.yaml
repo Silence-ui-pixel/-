@@ -297,7 +297,10 @@ components:
       type: object
       properties:
         sku_id: { type: integer, nullable: true }
+        sku_code: { type: string, nullable: true }
+        sku_name: { type: string, nullable: true }
         location_id: { type: integer, nullable: true }
+        location_code: { type: string, nullable: true }
         batch_no: { type: string }
         expiry_date: { type: string, format: date }
         inv_on_hand: { type: number }

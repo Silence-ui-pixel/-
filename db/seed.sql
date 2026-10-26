@@ -24,24 +24,40 @@ insert into app_user (username, display_name, password_hash, role) values
   ('op01',   '李操作员',   '$2b$12$5Z8W3kiy/PQgZnhPrfdgaO7v/ZnC4CMbnZqzi.CsucObNoxyVubNC', 'OPERATOR')
 on conflict (username) do nothing;
 
--- 库位：A 区 2 货架 x 3 层 x 2 位，加 1 个拣货位 + 1 个收货暂存位 + 1 个发货暂存位
+-- 库位：直接采用业务方现场给出的 13 个库位（db/field-data/location.csv）
 --
--- 三个功能位的分工（对应作业流的三段「暂存」）：
---   RECEIVING  收货暂存 —— 货到了但还没上架，账上算它的，但不算「可拣」
---   STAGING    发货暂存 —— 已拣出但还没发运，仍在账上（账实一致的最后一环）
---   PICKING    拣货位   —— 拆零拣货的黄金位，本次暂未用
+-- 编码约定：location_code 取 bin_code（A0101），不拼 warehouse-zone-rack-level-bin。
+-- bin_code 本身已经含了 zone(A) + rack(01) + level(01)，再拼会得到
+-- WH01-A-01-01-A0101 这种现场没人认得的串。
+--
+-- 历史坑：早期种子用的是拼接编码 WH01-A-01-01-01，和现场导入的 A0101
+-- 是同一个物理位却存成两行。后果有两个，都很隐蔽：
+--   1. 库位管理页显示 22 条，其中 6 对是同一个物理位
+--   2. get_functional_location 按 id 取第一个 RECEIVING 位，永远命中
+--      种子那个虚拟位，而现场真实暂存货在 C0101 —— 两处货互不相干
+-- 所以现在种子与现场数据共用同一套编码，import.sql 会按 location_code upsert。
+--
+-- 功能位分工（对应作业流三段「暂存」）：
+--   RECEIVING  收货暂存 —— 货到了但没上架，账上算它的，但不算「可拣」
+--   STAGING    发货暂存 —— 已拣出但没发运，仍在账上（账实一致的最后一环）
+--   QUARANTINE 隔离待检 —— 现场有 2 个位，当前空置，保留备用
 insert into location
-  (zone_code, rack_code, level_no, bin_code, location_code, location_type, pick_seq, capacity_qty)
+  (zone_code, rack_code, level_no, bin_code, location_code, location_type,
+   pick_seq, capacity_qty, is_mixed_sku, is_mixed_batch)
 values
-  ('A','01',1,'01','WH01-A-01-01-01','STORAGE', 1, 500),
-  ('A','01',1,'02','WH01-A-01-01-02','STORAGE', 2, 500),
-  ('A','01',2,'01','WH01-A-01-02-01','STORAGE', 3, 400),
-  ('A','01',2,'02','WH01-A-01-02-02','STORAGE', 4, 400),
-  ('A','02',1,'01','WH01-A-02-01-01','STORAGE', 5, 600),
-  ('A','02',1,'02','WH01-A-02-01-02','STORAGE', 6, 600),
-  ('A','00',1,'01','WH01-A-00-01-01','PICKING', 0, 100),
-  ('R','00',1,'01','WH01-R-00-01-01','RECEIVING', null, 9999),
-  ('S','00',1,'01','WH01-S-00-01-01','STAGING', null, 9999)
+  ('A','01',1,'A0101','A0101','STORAGE',    1, 120, false, true),
+  ('A','01',2,'A0102','A0102','STORAGE',    2, 120, false, true),
+  ('A','02',1,'A0201','A0201','STORAGE',    3, 100, false, false),
+  ('A','02',2,'A0202','A0202','STORAGE',    4, 100, false, false),
+  ('B','01',1,'B0101','B0101','STORAGE',    5, 150, true,  true),
+  ('B','01',2,'B0102','B0102','STORAGE',    6, 150, true,  true),
+  ('B','02',1,'B0201','B0201','STORAGE',    7,  80, false, true),
+  ('C','01',1,'C0101','C0101','RECEIVING', null, 200, true,  true),
+  ('C','01',2,'C0102','C0102','RECEIVING', null, 200, true,  true),
+  ('C','02',1,'C0201','C0201','STAGING',   null, 200, true,  true),
+  ('C','02',2,'C0202','C0202','STAGING',   null, 200, true,  true),
+  ('D','01',1,'D0101','D0101','QUARANTINE',null,  50, false, false),
+  ('D','01',2,'D0102','D0102','QUARANTINE',null,  50, false, false)
 on conflict (location_code) do nothing;
 
 -- 商品
@@ -57,7 +73,7 @@ on conflict (sku_code) do nothing;
 insert into inventory (sku_id, location_id, batch_no, expiry_date, qty_on_hand)
 select s.id, l.id, 'B20261001', date '2027-10-01', 200
   from sku s, location l
- where s.sku_code = 'SKU-1001' and l.location_code = 'WH01-A-01-01-01'
+ where s.sku_code = 'SKU-1001' and l.location_code = 'A0101'
 on conflict (sku_id, location_id, batch_no, expiry_date) do nothing;
 
 insert into stock_txn
@@ -68,7 +84,7 @@ select 'TXN-INIT-0001', 'RECEIPT', s.id, l.id, 'B20261001', date '2027-10-01',
        200, 0, 0, 200, 'MANUAL', 'IMPORT',
        (select id from app_user where username = 'admin'), '期初导入'
   from sku s, location l
- where s.sku_code = 'SKU-1001' and l.location_code = 'WH01-A-01-01-01'
+ where s.sku_code = 'SKU-1001' and l.location_code = 'A0101'
 on conflict (txn_no) do nothing;
 
 -- 自检：应当返回 1 行 OK

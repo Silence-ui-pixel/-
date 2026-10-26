@@ -161,16 +161,27 @@ async def get_recon(
     if current["role"] not in ("MANAGER", "ADMIN"):
         raise HTTPException(status_code=403, detail="需要仓管主管及以上权限")
 
-    sql = "select * from v_inventory_recon"
+    # 对账页要能直接显示「哪个商品在哪个库位不平」，所以这里 join 出编码。
+    # 用 left join：对账视图的用途就是查异常，万一库存行指向了已删除的 sku/location
+    # （理论上外键挡着，但视图是 union 出来的，宁可显示编码为空也不要让整页查不出来）
+    sql = """
+        select v.*, s.sku_code, s.name as sku_name, l.location_code
+        from v_inventory_recon v
+        left join sku s on s.id = v.sku_id
+        left join location l on l.id = v.location_id
+    """
     if recon_status:
-        sql += " where recon_status = :st"
+        sql += " where v.recon_status = :st"
     result = await session.execute(text(sql), {"st": recon_status} if recon_status else {})
     rows = result.mappings().all()
 
     items = [
         ReconItem(
             sku_id=r["sku_id"],
+            sku_code=r["sku_code"],
+            sku_name=r["sku_name"],
             location_id=r["location_id"],
+            location_code=r["location_code"],
             batch_no=r["batch_no"],
             expiry_date=r["expiry_date"],
             inv_on_hand=float(r["inv_on_hand"]),

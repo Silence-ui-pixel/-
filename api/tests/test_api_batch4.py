@@ -204,7 +204,7 @@ async def test_update_sku_batch_flag_blocked_with_stock(client, session, clean_s
     ).scalar_one()
     loc_id = (
         await session.execute(
-            text("select id from location where location_code = 'WH01-A-01-01-01'")
+            text("select id from location where location_code = 'A0101'")
         )
     ).scalar_one()
 

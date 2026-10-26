@@ -133,6 +133,26 @@ async def test_recon_manager(client):
     assert "items" in resp.json()
 
 
+async def test_recon_item_includes_codes(client):
+    """对账项必须带 sku_code / location_code。
+
+    对账页要显示「哪个商品在哪个库位不平」。只给 sku_id / location_id 的话，
+    前端得自己拿两个列表 join，join 不到时还没法排查（而这正是对账最需要的能力）。
+    """
+    token = await _login(client, "sup01", "sup123")
+    resp = await client.get(
+        "/api/v1/inventory/recon", headers={"Authorization": f"Bearer {token}"}
+    )
+    assert resp.status_code == 200
+    items = resp.json()["items"]
+    assert items, "种子数据应至少有一条对账记录"
+    for it in items:
+        assert "sku_code" in it, "对账项缺 sku_code"
+        assert "location_code" in it, "对账项缺 location_code"
+    # 种子期初库存是 200 件在 A0101，必然存在这条
+    assert any(it["sku_code"] == "SKU-1001" and it["location_code"] == "A0101" for it in items)
+
+
 async def test_inventory_item_includes_spec(client, session):
     """库存项必须带 spec（规格）。
 
