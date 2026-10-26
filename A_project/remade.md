@@ -271,6 +271,12 @@ B 建议写 `detail: None`，**我没照做** —— `contracts/openapi.yaml` �
   git -c http.proxy=http://127.0.0.1:PORT push origin main
   ```
 
+- ⚠️ **环境变量里的端口不一定是好用的那个**（10-26 23:59 实测）：
+  `env` 指向的 `64484` 出现「CONNECT tunnel failed, response 502」和
+  「schannel: server closed abruptly」连续失败，而这一刻 Clash 的 `7897` 是通的（200，1.08s），
+  换成 7897 一次推成功。
+  **做法**：按顺序试 `env` 给的值 → `7897` → 都不通就是整条链路断了，等几分钟。
+  常见端口：`7897`（Clash）/ `7890` / `10809`（v2ray）/ `64484`（会话代理）。
 - `git config --global url....insteadOf` 的镜像改写**已移除**（若恢复会把地址改回 `gitclone.com` 导致推送失败）。
 
 ### Docker Desktop 重启后，旧容器挂载会失效 ⚠️
