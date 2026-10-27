@@ -94,6 +94,17 @@ export const routes: AppRouteRecord[] = [
               sort: 2,
             },
           },
+          {
+            path: 'recon',
+            name: 'inventory-recon',
+            component: () => import('@/views/inventory/recon/index.vue'),
+            meta: {
+              title: '库存对账',
+              icon: 'DataAnalysis',
+              sort: 3,
+              roles: ['ADMIN', 'MANAGER'],
+            },
+          },
         ],
       },
 
