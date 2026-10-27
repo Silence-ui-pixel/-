@@ -251,9 +251,22 @@ export const routes: AppRouteRecord[] = [
     path: '/pda',
     name: 'pda-root',
     component: () => import('@/layout/pda.vue'),
-    redirect: '/pda/scan',
+    redirect: '/pda/home',
     meta: { layout: 'pda', title: 'PDA 作业', hidden: true },
     children: [
+      {
+        // PDA 首页：作业入口（按角色过滤功能卡）
+        path: 'home',
+        name: 'pda-home',
+        component: () => import('@/views/pda/home.vue'),
+        meta: {
+          title: '仓储作业',
+          icon: 'HomeFilled',
+          layout: 'pda',
+          keepAlive: false,
+          roles: ['ADMIN', 'MANAGER', 'OPERATOR', 'VIEWER'],
+        },
+      },
       {
         path: 'scan',
         name: 'pda-scan',

@@ -14,6 +14,9 @@ const router = useRouter()
 /** 当前页面标题（取自路由 meta.title，缺失时回退默认值） */
 const pageTitle = computed(() => (route.meta.title as string) ?? 'PDA 作业')
 
+/** 是否 PDA 首页（首页无返回按钮，它是入口而非子页） */
+const isHome = computed(() => route.name === 'pda-home')
+
 /** 返回上一页（无历史记录时回退到工作台） */
 function goBack() {
   if (window.history.length > 1) {
@@ -26,13 +29,14 @@ function goBack() {
 
 <template>
   <div class="pda-shell">
-    <!-- 顶部导航栏：返回按钮 + 页面标题 -->
+    <!-- 顶部导航栏：返回按钮 + 页面标题（首页不显示返回） -->
     <header class="pda-navbar">
-      <button class="pda-back" type="button" aria-label="返回" @click="goBack">
+      <button v-if="!isHome" class="pda-back" type="button" aria-label="返回" @click="goBack">
         <svg viewBox="0 0 24 24" width="22" height="22" fill="none" aria-hidden="true">
           <path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
         </svg>
       </button>
+      <span v-else class="pda-back pda-back--placeholder"></span>
       <span class="pda-title">{{ pageTitle }}</span>
       <!-- 占位，保持标题居中对称 -->
       <span class="pda-back pda-back--placeholder"></span>
