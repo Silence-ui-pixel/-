@@ -216,7 +216,8 @@ export const routes: AppRouteRecord[] = [
               title: '用户角色',
               icon: 'User',
               sort: 1,
-              roles: ['ADMIN'],
+              // 契约 list_users 声明「需 MANAGER/ADMIN」，与后端鉴权保持一致
+              roles: ['ADMIN', 'MANAGER'],
             },
           },
           {
