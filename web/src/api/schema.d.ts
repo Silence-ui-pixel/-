@@ -38,6 +38,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 用户分页列表（需 MANAGER/ADMIN，不含密码哈希） */
+        get: operations["list_users"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/skus": {
         parameters: {
             query?: never;
@@ -197,7 +214,7 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        /** 改明细数量（仅 DRAFT） */
+        /** 改明细数量（仅 DRAFT，需 MANAGER/ADMIN） */
         patch: operations["update_inbound_line"];
         trace?: never;
     };
@@ -212,7 +229,13 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** 收货（写暂存位，走 apply_txn RECEIPT） */
+        /**
+         * 收货（写暂存位，走 apply_txn RECEIPT；支持分次收货）
+         * @description 支持分次收货：同一明细可多次调用，实收量累加。
+         *     - 全部明细收满（实收 >= 应收）→ 单头 RECEIVED，明细 DONE
+         *     - 未收满 → 单头 RECEIVING，明细 PARTIAL，可继续收货
+         *     - 允许超收（实收 > 应收），入库是真实业务场景
+         */
         post: operations["receive_inbound_order"];
         delete?: never;
         options?: never;
@@ -250,7 +273,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** 取消入库单（仅 DRAFT/ARRIVED） */
+        /** 取消入库单（仅 DRAFT/ARRIVED，需 MANAGER/ADMIN） */
         post: operations["cancel_inbound_order"];
         delete?: never;
         options?: never;
@@ -306,7 +329,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** 分配库存（按明细行 FEFO 锁批次，只动 allocated_delta） */
+        /** 分配库存（按明细行 FEFO 锁批次，只动 allocated_delta；过期批次不参与） */
         post: operations["allocate_outbound_order"];
         delete?: never;
         options?: never;
@@ -364,7 +387,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** 取消出库单（DRAFT/ALLOCATED，ALLOCATED 走 DEALLOCATE 回滚） */
+        /** 取消出库单（DRAFT/ALLOCATED，需 MANAGER/ADMIN，ALLOCATED 走 DEALLOCATE 回滚） */
         post: operations["cancel_outbound_order"];
         delete?: never;
         options?: never;
@@ -460,6 +483,20 @@ export interface components {
             display_name?: string;
             /** @enum {string} */
             role?: "ADMIN" | "MANAGER" | "OPERATOR" | "VIEWER";
+        };
+        /** @description 用户列表项。比 User 多一个 status；任何 User 类型都不含 password_hash。 */
+        UserListItem: {
+            id?: number;
+            username?: string;
+            display_name?: string;
+            /** @enum {string} */
+            role?: "ADMIN" | "MANAGER" | "OPERATOR" | "VIEWER";
+            /** @description 1 启用 / 0 停用 */
+            status?: number;
+        };
+        UserListResponse: {
+            items?: components["schemas"]["UserListItem"][];
+            meta?: components["schemas"]["PageMeta"];
         };
         Sku: {
             id?: number;
@@ -592,7 +629,10 @@ export interface components {
         };
         ReconItem: {
             sku_id?: number | null;
+            sku_code?: string | null;
+            sku_name?: string | null;
             location_id?: number | null;
+            location_code?: string | null;
             batch_no?: string;
             /** Format: date */
             expiry_date?: string;
@@ -846,6 +886,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["User"];
+                };
+            };
+        };
+    };
+    list_users: {
+        parameters: {
+            query?: {
+                /** @description 对 username / display_name 模糊搜索 */
+                keyword?: string;
+                /** @description 按角色精确过滤（ADMIN / MANAGER / OPERATOR / VIEWER） */
+                role?: string;
+                page?: number;
+                page_size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserListResponse"];
+                };
+            };
+            /** @description 角色不足（需 MANAGER/ADMIN） */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
         };
@@ -1214,6 +1290,15 @@ export interface operations {
                     "application/json": components["schemas"]["OrderLine"];
                 };
             };
+            /** @description 角色不足（需 MANAGER/ADMIN） */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description 状态不是 DRAFT，不能改 */
             409: {
                 headers: {
@@ -1254,7 +1339,7 @@ export interface operations {
                     "application/json": components["schemas"]["InboundOrderDetail"];
                 };
             };
-            /** @description 状态不允许收货 或 实收超过应收 */
+            /** @description 状态不允许收货（已 RECEIVED/PUTAWAY/DONE 等） */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -1323,6 +1408,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["InboundOrder"];
+                };
+            };
+            /** @description 角色不足（需 MANAGER/ADMIN） */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description 状态不允许取消 */
@@ -1446,7 +1540,7 @@ export interface operations {
                     "application/json": components["schemas"]["OutboundOrderDetail"];
                 };
             };
-            /** @description 库存不足（detail 带 sku_code/batch_no/required/available/shortfall） */
+            /** @description 库存不足（含「仅有过期批次」场景；detail 带 sku_code/batch_no/required/available/shortfall） */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -1571,6 +1665,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OutboundOrder"];
+                };
+            };
+            /** @description 角色不足（需 MANAGER/ADMIN） */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description 状态不允许取消 */

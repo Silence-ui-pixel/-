@@ -16,31 +16,31 @@ export const skus: S['Sku'][] = [
   { id: 4, sku_code: 'SKU-1004', barcode: '690000000004', name: '方便面 红烧牛肉', spec: '24袋/箱', category: '食品', base_uom: 'EA', is_batch_managed: true, abc_class: 'C', safety_stock: 50, reorder_point: 100, status: 1, created_at: '2026-10-01T08:00:00Z', updated_at: '2026-10-01T08:00:00Z' },
 ]
 
-// 库位
+// 库位（编码与 db/seed.sql 一致：契约 v1.3 起 location_code = bin_code）
 export const locations: S['Location'][] = [
-  { id: 1, warehouse_code: 'WH01', zone_code: 'A', rack_code: '01', level_no: 1, bin_code: '01', location_code: 'WH01-A-01-01', location_type: 'STORAGE', pick_seq: 1, status: 1 },
-  { id: 2, warehouse_code: 'WH01', zone_code: 'A', rack_code: '01', level_no: 2, bin_code: '02', location_code: 'WH01-A-01-02', location_type: 'STORAGE', pick_seq: 2, status: 1 },
-  { id: 3, warehouse_code: 'WH01', zone_code: 'B', rack_code: '02', level_no: 1, bin_code: '01', location_code: 'WH01-B-02-01', location_type: 'STORAGE', pick_seq: 3, status: 1 },
-  { id: 4, warehouse_code: 'WH01', zone_code: 'R', rack_code: '00', level_no: 1, bin_code: '01', location_code: 'WH01-R-00-01', location_type: 'RECEIVING', pick_seq: null, status: 1 },
-  { id: 5, warehouse_code: 'WH01', zone_code: 'S', rack_code: '00', level_no: 1, bin_code: '01', location_code: 'WH01-S-00-01', location_type: 'STAGING', pick_seq: null, status: 1 },
+  { id: 1, warehouse_code: 'WH01', zone_code: 'A', rack_code: '01', level_no: 1, bin_code: 'A0101', location_code: 'A0101', location_type: 'STORAGE', pick_seq: 1, status: 1 },
+  { id: 2, warehouse_code: 'WH01', zone_code: 'A', rack_code: '01', level_no: 2, bin_code: 'A0102', location_code: 'A0102', location_type: 'STORAGE', pick_seq: 2, status: 1 },
+  { id: 3, warehouse_code: 'WH01', zone_code: 'B', rack_code: '02', level_no: 1, bin_code: 'B0201', location_code: 'B0201', location_type: 'STORAGE', pick_seq: 3, status: 1 },
+  { id: 4, warehouse_code: 'WH01', zone_code: 'C', rack_code: '01', level_no: 1, bin_code: 'C0101', location_code: 'C0101', location_type: 'RECEIVING', pick_seq: null, status: 1 },
+  { id: 5, warehouse_code: 'WH01', zone_code: 'C', rack_code: '02', level_no: 1, bin_code: 'C0201', location_code: 'C0201', location_type: 'STAGING', pick_seq: null, status: 1 },
 ]
 
 // 库存余额（InventoryItem：已含 sku/location 联表展示字段）
 export const inventoryItems: S['InventoryItem'][] = [
-  { sku_id: 1, sku_code: 'SKU-1001', sku_name: '矿泉水 500ml', spec: '24瓶/箱', location_id: 1, location_code: 'WH01-A-01-01', location_type: 'STORAGE', batch_no: '', expiry_date: '9999-12-30', qty_on_hand: 500, qty_allocated: 50, qty_available: 450, base_uom: 'EA' },
-  { sku_id: 2, sku_code: 'SKU-1002', sku_name: '纯牛奶 250ml', spec: '16盒/箱', location_id: 2, location_code: 'WH01-A-01-02', location_type: 'STORAGE', batch_no: 'B20260920', expiry_date: '2026-11-20', qty_on_hand: 300, qty_allocated: 120, qty_available: 180, base_uom: 'EA' },
-  { sku_id: 2, sku_code: 'SKU-1002', sku_name: '纯牛奶 250ml', spec: '16盒/箱', location_id: 2, location_code: 'WH01-A-01-02', location_type: 'STORAGE', batch_no: 'B20261001', expiry_date: '2026-12-01', qty_on_hand: 200, qty_allocated: 0, qty_available: 200, base_uom: 'EA' },
-  { sku_id: 3, sku_code: 'SKU-1003', sku_name: '抽纸 3层', spec: '10包/提', location_id: 3, location_code: 'WH01-B-02-01', location_type: 'STORAGE', batch_no: '', expiry_date: '9999-12-30', qty_on_hand: 800, qty_allocated: 0, qty_available: 800, base_uom: 'EA' },
-  { sku_id: 1, sku_code: 'SKU-1001', sku_name: '矿泉水 500ml', spec: '24瓶/箱', location_id: 4, location_code: 'WH01-R-00-01', location_type: 'RECEIVING', batch_no: 'B20261025', expiry_date: '9999-12-30', qty_on_hand: 200, qty_allocated: 0, qty_available: 200, base_uom: 'EA' },
+  { sku_id: 1, sku_code: 'SKU-1001', sku_name: '矿泉水 500ml', spec: '24瓶/箱', location_id: 1, location_code: 'A0101', location_type: 'STORAGE', batch_no: '', expiry_date: '9999-12-30', qty_on_hand: 500, qty_allocated: 50, qty_available: 450, base_uom: 'EA' },
+  { sku_id: 2, sku_code: 'SKU-1002', sku_name: '纯牛奶 250ml', spec: '16盒/箱', location_id: 2, location_code: 'A0102', location_type: 'STORAGE', batch_no: 'B20260920', expiry_date: '2026-11-20', qty_on_hand: 300, qty_allocated: 120, qty_available: 180, base_uom: 'EA' },
+  { sku_id: 2, sku_code: 'SKU-1002', sku_name: '纯牛奶 250ml', spec: '16盒/箱', location_id: 2, location_code: 'A0102', location_type: 'STORAGE', batch_no: 'B20261001', expiry_date: '2026-12-01', qty_on_hand: 200, qty_allocated: 0, qty_available: 200, base_uom: 'EA' },
+  { sku_id: 3, sku_code: 'SKU-1003', sku_name: '抽纸 3层', spec: '10包/提', location_id: 3, location_code: 'B0201', location_type: 'STORAGE', batch_no: '', expiry_date: '9999-12-30', qty_on_hand: 800, qty_allocated: 0, qty_available: 800, base_uom: 'EA' },
+  { sku_id: 1, sku_code: 'SKU-1001', sku_name: '矿泉水 500ml', spec: '24瓶/箱', location_id: 4, location_code: 'C0101', location_type: 'RECEIVING', batch_no: 'B20261025', expiry_date: '9999-12-30', qty_on_hand: 200, qty_allocated: 0, qty_available: 200, base_uom: 'EA' },
 ]
 
 // 库存流水
 export const stockTxns: S['StockTxnItem'][] = [
-  { id: 1, txn_no: 'IB-20261001-001-RECEIPT', txn_type: 'RECEIPT', sku_id: 1, sku_code: 'SKU-1001', location_code: 'WH01-R-00-01', batch_no: 'B20261025', expiry_date: '9999-12-31', on_hand_delta: 200, allocated_delta: 0, before_on_hand: 0, after_on_hand: 200, ref_type: 'INBOUND', ref_id: 2, source: 'PDA', created_at: '2026-10-25T09:30:00Z' },
-  { id: 2, txn_no: 'OB-20261020-001-ALLOCATE', txn_type: 'ALLOCATE', sku_id: 2, sku_code: 'SKU-1002', location_code: 'WH01-A-01-02', batch_no: 'B20260920', expiry_date: '2026-11-20', on_hand_delta: 0, allocated_delta: 120, before_on_hand: 300, after_on_hand: 300, ref_type: 'OUTBOUND', ref_id: 1, source: 'WEB', created_at: '2026-10-24T15:00:00Z' },
-  { id: 3, txn_no: 'OB-20261020-001-PICK', txn_type: 'PICK', sku_id: 2, sku_code: 'SKU-1002', location_code: 'WH01-A-01-02', batch_no: 'B20260920', expiry_date: '2026-11-20', on_hand_delta: 0, allocated_delta: -120, before_on_hand: 300, after_on_hand: 300, ref_type: 'OUTBOUND', ref_id: 1, source: 'PDA', created_at: '2026-10-24T16:00:00Z' },
-  { id: 4, txn_no: 'OB-20261020-001-SHIP', txn_type: 'SHIP', sku_id: 2, sku_code: 'SKU-1002', location_code: 'WH01-A-01-02', batch_no: 'B20260920', expiry_date: '2026-11-20', on_hand_delta: -120, allocated_delta: 0, before_on_hand: 300, after_on_hand: 180, ref_type: 'OUTBOUND', ref_id: 1, source: 'WEB', created_at: '2026-10-24T17:00:00Z' },
-  { id: 5, txn_no: 'ADJ-20261025-001', txn_type: 'ADJUST', sku_id: 3, sku_code: 'SKU-1003', location_code: 'WH01-B-02-01', batch_no: '', expiry_date: '9999-12-31', on_hand_delta: 50, allocated_delta: 0, before_on_hand: 750, after_on_hand: 800, ref_type: 'MANUAL', source: 'WEB', created_at: '2026-10-25T10:00:00Z' },
+  { id: 1, txn_no: 'IB-20261001-001-RECEIPT', txn_type: 'RECEIPT', sku_id: 1, sku_code: 'SKU-1001', location_code: 'C0101', batch_no: 'B20261025', expiry_date: '9999-12-31', on_hand_delta: 200, allocated_delta: 0, before_on_hand: 0, after_on_hand: 200, ref_type: 'INBOUND', ref_id: 2, source: 'PDA', created_at: '2026-10-25T09:30:00Z' },
+  { id: 2, txn_no: 'OB-20261020-001-ALLOCATE', txn_type: 'ALLOCATE', sku_id: 2, sku_code: 'SKU-1002', location_code: 'A0102', batch_no: 'B20260920', expiry_date: '2026-11-20', on_hand_delta: 0, allocated_delta: 120, before_on_hand: 300, after_on_hand: 300, ref_type: 'OUTBOUND', ref_id: 1, source: 'WEB', created_at: '2026-10-24T15:00:00Z' },
+  { id: 3, txn_no: 'OB-20261020-001-PICK', txn_type: 'PICK', sku_id: 2, sku_code: 'SKU-1002', location_code: 'A0102', batch_no: 'B20260920', expiry_date: '2026-11-20', on_hand_delta: 0, allocated_delta: -120, before_on_hand: 300, after_on_hand: 300, ref_type: 'OUTBOUND', ref_id: 1, source: 'PDA', created_at: '2026-10-24T16:00:00Z' },
+  { id: 4, txn_no: 'OB-20261020-001-SHIP', txn_type: 'SHIP', sku_id: 2, sku_code: 'SKU-1002', location_code: 'A0102', batch_no: 'B20260920', expiry_date: '2026-11-20', on_hand_delta: -120, allocated_delta: 0, before_on_hand: 300, after_on_hand: 180, ref_type: 'OUTBOUND', ref_id: 1, source: 'WEB', created_at: '2026-10-24T17:00:00Z' },
+  { id: 5, txn_no: 'ADJ-20261025-001', txn_type: 'ADJUST', sku_id: 3, sku_code: 'SKU-1003', location_code: 'B0201', batch_no: '', expiry_date: '9999-12-31', on_hand_delta: 50, allocated_delta: 0, before_on_hand: 750, after_on_hand: 800, ref_type: 'MANUAL', source: 'WEB', created_at: '2026-10-25T10:00:00Z' },
 ]
 
 // 对账视图
@@ -80,6 +80,6 @@ export const outboundLines: S['OrderLine'][] = [
 // 拣货计划（出库分配后返回的拣货路径）
 export const pickPlan: S['PickPlanResponse'] = {
   lines: [
-    { line_id: 401, sku_id: 2, sku_code: 'SKU-1002', sku_name: '纯牛奶 250ml', location_id: 2, location_code: 'WH01-A-01-02', qty_required: 120, batch_no: 'B20260920', expiry_date: '2026-11-20' },
+    { line_id: 401, sku_id: 2, sku_code: 'SKU-1002', sku_name: '纯牛奶 250ml', location_id: 2, location_code: 'A0102', qty_required: 120, batch_no: 'B20260920', expiry_date: '2026-11-20' },
   ],
 }

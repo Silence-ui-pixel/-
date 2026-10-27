@@ -95,12 +95,16 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { client, ApiError, makeIdempotencyKey } from '@/api/client'
-import type { components } from '@/api/schema'
+import type { components, paths } from '@/api/schema'
 
 type InboundOrder = components['schemas']['InboundOrder']
 type InboundOrderDetail = components['schemas']['InboundOrderDetail']
 type Sku = components['schemas']['Sku']
+type InboundListQuery = NonNullable<paths['/inbound-orders']['get']['parameters']['query']>
 type Mode = 'receive' | 'putaway'
+
+/** 可收货状态：契约 v1.1 起支持分次收货，未收满时单头为 RECEIVING，仍可继续收 */
+const RECEIVABLE_STATUS = ['DRAFT', 'ARRIVED', 'RECEIVING']
 
 const STATUS_TEXT: Record<string, string> = {
   DRAFT: '草稿',
@@ -156,11 +160,14 @@ async function loadSkus() {
 async function loadOrders() {
   loading.value = true
   try {
-    const status = mode.value === 'receive' ? 'DRAFT' : 'RECEIVED'
-    const { data } = await client.GET('/inbound-orders', {
-      params: { query: { status, page: 1, page_size: 50 } },
-    })
-    orders.value = data?.items ?? []
+    // 契约 list 只支持单个 status；收货需覆盖 DRAFT/ARRIVED/RECEIVING，故查全量后前端过滤
+    const query: InboundListQuery = { page: 1, page_size: 100 }
+    if (mode.value === 'putaway') query.status = 'RECEIVED'
+
+    const { data } = await client.GET('/inbound-orders', { params: { query } })
+    const all = data?.items ?? []
+    orders.value =
+      mode.value === 'receive' ? all.filter((o) => RECEIVABLE_STATUS.includes(o.status ?? '')) : all
   } catch (e) {
     ElMessage.error(e instanceof ApiError ? e.message : '加载失败')
     orders.value = []

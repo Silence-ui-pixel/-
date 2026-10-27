@@ -64,7 +64,7 @@
           <template #default="{ row }">
             <el-button link type="primary" @click="openDetail(row)">详情</el-button>
             <el-button
-              v-if="row.status === 'DRAFT'"
+              v-if="row.status === 'DRAFT' || row.status === 'ARRIVED'"
               link
               type="danger"
               :disabled="cancellingId === row.id"
