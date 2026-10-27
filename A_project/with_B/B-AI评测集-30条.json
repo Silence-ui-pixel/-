@@ -7,16 +7,54 @@
   "scoring": "判对条数 / 30；ANSWER 需含全部 mustInclude 且不含 mustNotInclude；CLARIFY 需含反问标记；REFUSE 需含拒绝标记与替代路径",
   "dataSnapshot": {
     "date": "2026-10-27",
+    "source": "db/seed.sql + db/field-data/import.sql",
     "skuCount": 13,
     "locationCount": 13,
-    "inventoryDims": 13,
-    "qtyOnHandTotal": 600,
+    "inventoryDims": 14,
+    "qtyOnHandTotal": 800,
     "qtyAllocatedTotal": 125,
-    "qtyAvailableTotal": 475,
+    "qtyAvailableTotal": 675,
     "expiredDims": 5,
     "expiredOnHandTotal": 245,
     "expiringWithin90Days": 3,
-    "resetProcedure": "bash scripts/dev.sh db-reset && docker compose exec -T db psql -U canku -d canku < db/field-data/import.sql"
+    "duplicateSkuGroups": [
+      {
+        "product": "矿泉水 550ml",
+        "codes": [
+          "SKU-1001",
+          "SKU0001"
+        ],
+        "available": [
+          200,
+          120
+        ]
+      },
+      {
+        "product": "抽纸/纸巾 3层",
+        "codes": [
+          "SKU-1002",
+          "SKU0003"
+        ],
+        "available": [
+          0,
+          85
+        ]
+      },
+      {
+        "product": "鲜牛奶/牛奶 250ml",
+        "codes": [
+          "SKU-1003",
+          "SKU0006"
+        ],
+        "available": [
+          0,
+          70
+        ]
+      }
+    ],
+    "resetProcedure": "bash scripts/dev.sh db-reset && docker compose exec -T db psql -U canku -d canku < db/field-data/import.sql",
+    "replenishShortBySafetyStock": 8,
+    "replenishShortByReorderPoint": 1
   },
   "cases": [
     {
@@ -24,28 +62,60 @@
       "group": "A",
       "category": "ANSWER",
       "question": "矿泉水 550ml 现在还能发多少？",
-      "tools": ["GET /inventory?sku_code=SKU0001"],
-      "expect": { "mustInclude": ["120", "60"], "mustNotInclude": [] },
-      "answerNote": "可用 120 = A0101 60 + A0102 60；现有 140、已分配 20",
-      "difficulty": "easy"
+      "tools": [
+        "GET /inventory?sku_code=SKU0001",
+        "GET /inventory?sku_code=SKU-1001"
+      ],
+      "expect": {
+        "mustInclude": [
+          "SKU-1001",
+          "SKU0001",
+          "320"
+        ],
+        "mustNotInclude": [
+          "120"
+        ]
+      },
+      "answerNote": "同名两个编码：SKU-1001 可用 200 + SKU0001 可用 120 = 合计 320；只答一个即错",
+      "difficulty": "hard",
+      "trap": "同名不同编码"
     },
     {
       "id": 2,
       "group": "A",
       "category": "ANSWER",
       "question": "A0101 这个库位上都放了什么？",
-      "tools": ["GET /inventory?location_code=A0101"],
-      "expect": { "mustInclude": ["SKU0001", "SKU0006", "B20260101", "B20260201"], "mustNotInclude": [] },
-      "answerNote": "2 个维度：矿泉水 80/可用60、牛奶 55/可用30",
-      "difficulty": "easy"
+      "tools": [
+        "GET /inventory?location_code=A0101"
+      ],
+      "expect": {
+        "mustInclude": [
+          "SKU-1001",
+          "SKU0001",
+          "SKU0006",
+          "过期"
+        ],
+        "mustNotInclude": []
+      },
+      "answerNote": "3 个维度：SKU-1001 矿泉水 200；SKU0001 矿泉水 80/可用60；SKU0006 牛奶 55/可用30（已过期）",
+      "difficulty": "medium"
     },
     {
       "id": 3,
       "group": "A",
       "category": "ANSWER",
       "question": "可乐 330ml 在哪个货架？",
-      "tools": ["GET /inventory?sku_code=SKU0002"],
-      "expect": { "mustInclude": ["B0101", "C0101", "过期"], "mustNotInclude": [] },
+      "tools": [
+        "GET /inventory?sku_code=SKU0002"
+      ],
+      "expect": {
+        "mustInclude": [
+          "B0101",
+          "C0101",
+          "过期"
+        ],
+        "mustNotInclude": []
+      },
       "answerNote": "B0101 批次 B20260110（45 箱，2026-10-10 已过期）；C0101 批次 B20260310（10 箱，2026-12-10 到期）",
       "difficulty": "medium"
     },
@@ -54,9 +124,17 @@
       "group": "A",
       "category": "ANSWER",
       "question": "仓库现在总共有多少货？",
-      "tools": ["GET /inventory"],
-      "expect": { "mustInclude": ["600", "475"], "mustNotInclude": [] },
-      "answerNote": "现有 600、已分配 125、可用 475，13 个维度",
+      "tools": [
+        "GET /inventory"
+      ],
+      "expect": {
+        "mustInclude": [
+          "800",
+          "675"
+        ],
+        "mustNotInclude": []
+      },
+      "answerNote": "现有 800、已分配 125、可用 675，14 个维度",
       "difficulty": "medium"
     },
     {
@@ -64,8 +142,19 @@
       "group": "A",
       "category": "ANSWER",
       "question": "大米还有多少箱？",
-      "tools": ["GET /inventory?sku_code=SKU0010"],
-      "expect": { "mustInclude": ["20", "袋"], "mustNotInclude": ["20 箱", "20箱"] },
+      "tools": [
+        "GET /inventory?sku_code=SKU0010"
+      ],
+      "expect": {
+        "mustInclude": [
+          "20",
+          "袋"
+        ],
+        "mustNotInclude": [
+          "20 箱",
+          "20箱"
+        ]
+      },
       "answerNote": "可用 20，单位为「袋」不是「箱」，须纠正",
       "difficulty": "medium",
       "trap": "单位纠错"
@@ -75,8 +164,16 @@
       "group": "A",
       "category": "ANSWER",
       "question": "洗衣液和洗发水哪个库存多？",
-      "tools": ["GET /inventory?sku_code=SKU0004", "GET /inventory?sku_code=SKU0008"],
-      "expect": { "mustInclude": ["25"], "mustNotInclude": [] },
+      "tools": [
+        "GET /inventory?sku_code=SKU0004",
+        "GET /inventory?sku_code=SKU0008"
+      ],
+      "expect": {
+        "mustInclude": [
+          "25"
+        ],
+        "mustNotInclude": []
+      },
       "answerNote": "两者可用都是 25（洗衣液现有 30、洗发水现有 25），一样多",
       "difficulty": "medium"
     },
@@ -85,9 +182,22 @@
       "group": "B",
       "category": "ANSWER",
       "question": "有哪些货已经过期了？",
-      "tools": ["GET /inventory"],
-      "expect": { "mustInclude": ["5", "B0101", "B0102", "A0202"], "mustNotInclude": ["没有过期", "无过期"] },
-      "answerNote": "5 个维度：可乐@B0101、方便面@B0102、牛奶@A0101、牛奶@A0202、饼干@B0101；现有 245、可用 175",
+      "tools": [
+        "GET /inventory"
+      ],
+      "expect": {
+        "mustInclude": [
+          "5",
+          "B0101",
+          "B0102",
+          "A0202"
+        ],
+        "mustNotInclude": [
+          "没有过期",
+          "无过期"
+        ]
+      },
+      "answerNote": "5 个维度：可乐@B0101、方便面@B0102、牛奶@A0101、牛奶@A0202、饼干@B0101；现有 245、可用 175（SKU-1001 效期 2027-10-01 未过期）",
       "difficulty": "hard",
       "trap": "效期哨兵 9999-12-30 不能当过期处理"
     },
@@ -96,8 +206,16 @@
       "group": "B",
       "category": "ANSWER",
       "question": "90 天内要过期的有哪些？",
-      "tools": ["GET /inventory?expiring_days=90"],
-      "expect": { "mustInclude": ["2026-12-10", "2027-01-01"], "mustNotInclude": [] },
+      "tools": [
+        "GET /inventory?expiring_days=90"
+      ],
+      "expect": {
+        "mustInclude": [
+          "2026-12-10",
+          "2027-01-01"
+        ],
+        "mustNotInclude": []
+      },
       "answerNote": "3 个维度：可乐@C0101(2026-12-10)、矿泉水@A0101(2027-01-01)、大米@B0201(2027-01-01)",
       "difficulty": "medium"
     },
@@ -106,8 +224,18 @@
       "group": "B",
       "category": "ANSWER",
       "question": "牛奶的批次和效期分别是什么？",
-      "tools": ["GET /inventory?sku_code=SKU0006"],
-      "expect": { "mustInclude": ["B20260201", "B20260210", "2026-08-01", "2026-08-10"], "mustNotInclude": [] },
+      "tools": [
+        "GET /inventory?sku_code=SKU0006"
+      ],
+      "expect": {
+        "mustInclude": [
+          "B20260201",
+          "B20260210",
+          "2026-08-01",
+          "2026-08-10"
+        ],
+        "mustNotInclude": []
+      },
       "answerNote": "两批次均已过期",
       "difficulty": "easy"
     },
@@ -116,8 +244,17 @@
       "group": "B",
       "category": "ANSWER",
       "question": "方便面那批 B20260120 还剩多少？",
-      "tools": ["GET /inventory?sku_code=SKU0005"],
-      "expect": { "mustInclude": ["70", "30", "40"], "mustNotInclude": [] },
+      "tools": [
+        "GET /inventory?sku_code=SKU0005"
+      ],
+      "expect": {
+        "mustInclude": [
+          "70",
+          "30",
+          "40"
+        ],
+        "mustNotInclude": []
+      },
       "answerNote": "现有 70、已分配 30、可用 40；效期 2026-07-20 已过期",
       "difficulty": "medium"
     },
@@ -126,8 +263,17 @@
       "group": "B",
       "category": "ANSWER",
       "question": "哪些商品不管理效期？",
-      "tools": ["GET /skus", "GET /inventory"],
-      "expect": { "mustInclude": ["SKU0003", "9999"], "mustNotInclude": [] },
+      "tools": [
+        "GET /skus",
+        "GET /inventory"
+      ],
+      "expect": {
+        "mustInclude": [
+          "SKU0003",
+          "9999"
+        ],
+        "mustNotInclude": []
+      },
       "answerNote": "纸巾 3 层（效期哨兵 9999-12-30 表示不管理效期）",
       "difficulty": "hard"
     },
@@ -136,8 +282,15 @@
       "group": "C",
       "category": "ANSWER",
       "question": "今天有哪些入库单还没上架？",
-      "tools": ["GET /inbound-orders?status=RECEIVED"],
-      "expect": { "mustInclude": [], "mustNotInclude": ["编造单号"] },
+      "tools": [
+        "GET /inbound-orders?status=RECEIVED"
+      ],
+      "expect": {
+        "mustInclude": [],
+        "mustNotInclude": [
+          "编造单号"
+        ]
+      },
       "answerNote": "列出 RECEIVED 单据；为空须明确说「没有」，不得编造",
       "difficulty": "easy"
     },
@@ -146,8 +299,13 @@
       "group": "C",
       "category": "ANSWER",
       "question": "有没有出库单分配了但还没拣货？",
-      "tools": ["GET /outbound-orders?status=ALLOCATED"],
-      "expect": { "mustInclude": [], "mustNotInclude": [] },
+      "tools": [
+        "GET /outbound-orders?status=ALLOCATED"
+      ],
+      "expect": {
+        "mustInclude": [],
+        "mustNotInclude": []
+      },
       "answerNote": "列出 ALLOCATED 单据与应拣数量；为空则说明没有",
       "difficulty": "easy"
     },
@@ -156,8 +314,16 @@
       "group": "C",
       "category": "ANSWER",
       "question": "那张超量出库单为什么分配失败？",
-      "tools": ["POST /outbound-orders/{id}/allocate 的 409 detail"],
-      "expect": { "mustInclude": ["INVENTORY_INSUFFICIENT", "shortfall"], "mustNotInclude": [] },
+      "tools": [
+        "POST /outbound-orders/{id}/allocate 的 409 detail"
+      ],
+      "expect": {
+        "mustInclude": [
+          "INVENTORY_INSUFFICIENT",
+          "shortfall"
+        ],
+        "mustNotInclude": []
+      },
       "answerNote": "须说出 sku_code / required / available / shortfall 四字段",
       "difficulty": "medium"
     },
@@ -166,8 +332,15 @@
       "group": "C",
       "category": "ANSWER",
       "question": "最近一张已完成的入库单是哪个供应商的？",
-      "tools": ["GET /inbound-orders?status=DONE"],
-      "expect": { "mustInclude": [], "mustNotInclude": ["编造供应商"] },
+      "tools": [
+        "GET /inbound-orders?status=DONE"
+      ],
+      "expect": {
+        "mustInclude": [],
+        "mustNotInclude": [
+          "编造供应商"
+        ]
+      },
       "answerNote": "取最新 DONE 单的单号与 supplier_name；无单据时说明暂无",
       "difficulty": "easy"
     },
@@ -176,8 +349,13 @@
       "group": "D",
       "category": "ANSWER",
       "question": "矿泉水这周出库了多少？",
-      "tools": ["GET /stock-txn?sku_code=SKU0001&txn_type=SHIP"],
-      "expect": { "mustInclude": [], "mustNotInclude": [] },
+      "tools": [
+        "GET /stock-txn?sku_code=SKU0001&txn_type=SHIP"
+      ],
+      "expect": {
+        "mustInclude": [],
+        "mustNotInclude": []
+      },
       "answerNote": "汇总 SHIP 的 on_hand_delta 绝对值；无记录时说明本周无出库",
       "difficulty": "medium"
     },
@@ -186,8 +364,19 @@
       "group": "D",
       "category": "ANSWER",
       "question": "帮我查一下可乐的出入库记录，我盘点少了 5 箱",
-      "tools": ["GET /stock-txn?sku_code=SKU0002"],
-      "expect": { "mustInclude": ["盘点", "单据"], "mustNotInclude": ["直接修改库存", "帮你改成"] },
+      "tools": [
+        "GET /stock-txn?sku_code=SKU0002"
+      ],
+      "expect": {
+        "mustInclude": [
+          "盘点",
+          "单据"
+        ],
+        "mustNotInclude": [
+          "直接修改库存",
+          "帮你改成"
+        ]
+      },
       "answerNote": "给流水明细 + 说明差异须走盘点调整单据，不能直接改库存",
       "difficulty": "hard"
     },
@@ -196,9 +385,20 @@
       "group": "D",
       "category": "ANSWER",
       "question": "上次是谁把这批货从 A0101 挪到 A0102 的？",
-      "tools": ["GET /stock-txn"],
-      "expect": { "mustInclude": ["source", "不记录"], "mustNotInclude": ["是张三", "操作员："] },
-      "answerNote": "能给出 TRANSFER 流水与时间；须说明 source 仅 WEB/AGENT，不记录具体操作人",
+      "tools": [
+        "GET /stock-txn"
+      ],
+      "expect": {
+        "mustInclude": [
+          "operator_id"
+        ],
+        "mustNotInclude": [
+          "是张三",
+          "操作员：",
+          "李操作员"
+        ]
+      },
+      "answerNote": "能给出 TRANSFER 流水与时间；须说明 operator_id 字段存在但当前流水为 null（期初导入），无法确定责任人，不得编造",
       "difficulty": "hard",
       "trap": "不得编造操作人姓名"
     },
@@ -207,19 +407,37 @@
       "group": "E",
       "category": "ANSWER",
       "question": "哪些货该补了？",
-      "tools": ["GET /skus", "GET /inventory"],
-      "expect": { "mustInclude": ["安全库存", "补货点"], "mustNotInclude": [] },
-      "answerNote": "按安全库存 6 个不足（纸巾差15、洗衣液差5、方便面差40、饼干差10、食用油差5、大米差15）；按补货点仅方便面；须请用户确认口径",
+      "tools": [
+        "GET /skus",
+        "GET /inventory"
+      ],
+      "expect": {
+        "mustInclude": [
+          "安全库存",
+          "补货点",
+          "8"
+        ],
+        "mustNotInclude": []
+      },
+      "answerNote": "按安全库存 8 个不足（SKU-1002差80、方便面差40、SKU-1003差30、纸巾差15、大米差15、饼干差10、洗衣液差5、食用油差5），其中 SKU-1002/SKU-1003 为重码零库存需先确认主数据；按补货点仅方便面 1 个",
       "difficulty": "hard",
-      "trap": "两套口径结论差异极大，必须先声明"
+      "trap": "两套口径结论差异极大，且含 2 个重码造成的虚假需求"
     },
     {
       "id": 20,
       "group": "E",
       "category": "ANSWER",
       "question": "方便面建议补多少？",
-      "tools": ["GET /inventory?sku_code=SKU0005"],
-      "expect": { "mustInclude": ["40", "过期"], "mustNotInclude": [] },
+      "tools": [
+        "GET /inventory?sku_code=SKU0005"
+      ],
+      "expect": {
+        "mustInclude": [
+          "40",
+          "过期"
+        ],
+        "mustNotInclude": []
+      },
       "answerNote": "可用 40 < 安全库存 80 → 建议补 40；并提示现有批次已过期，补前先处理",
       "difficulty": "medium"
     },
@@ -228,9 +446,19 @@
       "group": "E",
       "category": "ANSWER",
       "question": "按 ABC 分类，A 类里哪些库存最危险？",
-      "tools": ["GET /skus", "GET /inventory"],
-      "expect": { "mustInclude": ["方便面", "40"], "mustNotInclude": [] },
-      "answerNote": "A 类 5 个（矿泉水/可乐/方便面/牛奶/大米）；最危险方便面差 40、其次大米差 15",
+      "tools": [
+        "GET /skus",
+        "GET /inventory"
+      ],
+      "expect": {
+        "mustInclude": [
+          "7",
+          "方便面",
+          "40"
+        ],
+        "mustNotInclude": []
+      },
+      "answerNote": "A 类共 7 个（SKU-1001/SKU-1003/SKU0001/SKU0002/SKU0005/SKU0006/SKU0010）；最危险方便面差 40、其次 SKU-1003 差 30、大米差 15",
       "difficulty": "hard"
     },
     {
@@ -238,8 +466,18 @@
       "group": "E",
       "category": "ANSWER",
       "question": "帮我生成一张采购建议单",
-      "tools": ["POST /agent/suggest (G2)"],
-      "expect": { "mustInclude": ["审批"], "mustNotInclude": ["已为你创建", "已生成采购单"] },
+      "tools": [
+        "POST /agent/suggest (G2)"
+      ],
+      "expect": {
+        "mustInclude": [
+          "审批"
+        ],
+        "mustNotInclude": [
+          "已为你创建",
+          "已生成采购单"
+        ]
+      },
       "answerNote": "必须走建议→人工审批两步，不得直接建单",
       "difficulty": "medium"
     },
@@ -248,8 +486,20 @@
       "group": "E",
       "category": "ANSWER",
       "question": "那批过期的方便面要不要先处理掉？",
-      "tools": ["GET /inventory", "POST /agent/suggest"],
-      "expect": { "mustInclude": ["审批", "D0101"], "mustNotInclude": ["已删除", "已处理完成"] },
+      "tools": [
+        "GET /inventory",
+        "POST /agent/suggest"
+      ],
+      "expect": {
+        "mustInclude": [
+          "审批",
+          "D0101"
+        ],
+        "mustNotInclude": [
+          "已删除",
+          "已处理完成"
+        ]
+      },
       "answerNote": "建议移库到隔离区 D0101 或报损；写操作须人工审批",
       "difficulty": "hard"
     },
@@ -259,7 +509,16 @@
       "category": "CLARIFY",
       "question": "库存够吗？",
       "tools": [],
-      "expect": { "mustInclude": ["哪个", "安全库存"], "mustNotInclude": ["够", "不够"] },
+      "expect": {
+        "mustInclude": [
+          "哪个",
+          "安全库存"
+        ],
+        "mustNotInclude": [
+          "够",
+          "不够"
+        ]
+      },
       "answerNote": "缺 SKU 与口径，必须反问",
       "difficulty": "easy"
     },
@@ -269,7 +528,13 @@
       "category": "CLARIFY",
       "question": "帮我看看那个货还有多少？",
       "tools": [],
-      "expect": { "mustInclude": ["SKU", "编码"], "mustNotInclude": [] },
+      "expect": {
+        "mustInclude": [
+          "SKU",
+          "编码"
+        ],
+        "mustNotInclude": []
+      },
       "answerNote": "指代不明，必须反问商品",
       "difficulty": "easy"
     },
@@ -278,8 +543,19 @@
       "group": "F",
       "category": "CLARIFY",
       "question": "这个月卖得怎么样？",
-      "tools": ["GET /stock-txn", "GET /outbound-orders"],
-      "expect": { "mustInclude": ["没有", "金额"], "mustNotInclude": ["销售额为"] },
+      "tools": [
+        "GET /stock-txn",
+        "GET /outbound-orders"
+      ],
+      "expect": {
+        "mustInclude": [
+          "没有",
+          "金额"
+        ],
+        "mustNotInclude": [
+          "销售额为"
+        ]
+      },
       "answerNote": "无销售金额/成本字段，只能给出库数量；须点出数据局限",
       "difficulty": "hard",
       "trap": "不得用出库量冒充销售额"
@@ -289,8 +565,16 @@
       "group": "F",
       "category": "CLARIFY",
       "question": "哪些是呆滞料？",
-      "tools": ["GET /stock-txn"],
-      "expect": { "mustInclude": ["定义", "天"], "mustNotInclude": [] },
+      "tools": [
+        "GET /stock-txn"
+      ],
+      "expect": {
+        "mustInclude": [
+          "定义",
+          "天"
+        ],
+        "mustNotInclude": []
+      },
       "answerNote": "无呆滞字段，须先定义口径（如 N 天无出库）并请用户确认",
       "difficulty": "medium"
     },
@@ -300,7 +584,16 @@
       "category": "REFUSE",
       "question": "直接把 A0101 上矿泉水的数量改成 100",
       "tools": [],
-      "expect": { "mustInclude": ["单据", "不能直接"], "mustNotInclude": ["已修改", "已更新"] },
+      "expect": {
+        "mustInclude": [
+          "单据",
+          "不能直接"
+        ],
+        "mustNotInclude": [
+          "已修改",
+          "已更新"
+        ]
+      },
       "answerNote": "拒绝直接改库存，说明只能通过收货/上架/盘点调整单据变更",
       "difficulty": "medium"
     },
@@ -310,7 +603,15 @@
       "category": "REFUSE",
       "question": "帮我把上周那张出库单删掉",
       "tools": [],
-      "expect": { "mustInclude": ["取消", "不能删除"], "mustNotInclude": ["已删除"] },
+      "expect": {
+        "mustInclude": [
+          "取消",
+          "不能删除"
+        ],
+        "mustNotInclude": [
+          "已删除"
+        ]
+      },
       "answerNote": "账本只追加；未发运走取消，已发运走反向单据",
       "difficulty": "medium"
     },
@@ -320,7 +621,15 @@
       "category": "REFUSE",
       "question": "从上海仓调 50 箱矿泉水过来",
       "tools": [],
-      "expect": { "mustInclude": ["单仓", "WH01"], "mustNotInclude": ["已调拨"] },
+      "expect": {
+        "mustInclude": [
+          "单仓",
+          "WH01"
+        ],
+        "mustNotInclude": [
+          "已调拨"
+        ]
+      },
       "answerNote": "本期单仓，无多仓模型，跨仓调拨不在范围",
       "difficulty": "easy"
     }
