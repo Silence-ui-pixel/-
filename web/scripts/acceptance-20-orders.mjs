@@ -75,6 +75,8 @@ const stats = {
   /** 本次运行创建的入库 / 出库单 id（终态检查只看自己造的，不误伤历史单据） */
   inboundIds: [],
   outboundIds: [],
+  /** 连跑中失败的轮次（不中断，跑完统一汇总） */
+  failedRounds: [],
 }
 
 /** 运行开始时的暂存位基线（同一维度已有库存不算本次残留） */
@@ -85,8 +87,9 @@ function record(label, resp, { allow } = {}) {
   // 默认接受任意 2xx：建单类接口返回 201，不能只放 200
   const ok = allow ? allow.includes(resp.status) : resp.status >= 200 && resp.status < 300
   if (!ok) {
-    const msg = resp.data?.message || resp.data?.detail || JSON.stringify(resp.data).slice(0, 160)
-    throw new Error(`${label} 失败：HTTP ${resp.status} ${msg}`)
+    const msg = resp.data?.message || resp.data?.detail || JSON.stringify(resp.data)
+    const detail = resp.data?.detail ? `｜detail=${JSON.stringify(resp.data.detail)}` : ''
+    throw new Error(`${label} 失败：HTTP ${resp.status} ${typeof msg === 'string' ? msg : JSON.stringify(msg)}${detail}`)
   }
   return resp.data
 }
@@ -533,19 +536,34 @@ function printReport(anomalyResults, concurrencyResults, checks) {
   console.log(`  出库单（创建/发运）  ${stats.outboundCreated} / ${stats.outboundShipped}`)
   console.log(`  接口调用次数      ${stats.steps} 次（异常场景与并发另计）`)
 
+  if (stats.failedRounds.length) {
+    console.log(`\n【连跑失败轮次】${stats.failedRounds.length} 轮`)
+    for (const f of stats.failedRounds) console.log(`  第 ${f.round} 轮：${f.error}`)
+  }
+
   console.log('\n【异常与并发】')
   for (const r of [...anomalyResults, ...concurrencyResults]) {
     console.log(`  ${r.pass ? '✅' : '❌'} ${r.name}`)
     console.log(`      ${r.detail}`)
   }
 
+  const roundCheck = {
+    name: `连跑 ${ROUNDS} 轮全部成功`,
+    pass: stats.failedRounds.length === 0,
+    detail: stats.failedRounds.length
+      ? `${ROUNDS - stats.failedRounds.length}/${ROUNDS} 轮成功，失败轮次：` +
+        stats.failedRounds.map((f) => `第 ${f.round} 轮`).join('、')
+      : `${ROUNDS}/${ROUNDS} 轮成功`,
+  }
+  const allChecks = [roundCheck, ...checks]
+
   console.log('\n【终检】')
-  for (const c of checks) {
+  for (const c of allChecks) {
     console.log(`  ${c.pass ? '✅' : '❌'} ${c.name}`)
     console.log(`      ${c.detail}`)
   }
 
-  const all = [...anomalyResults, ...concurrencyResults, ...checks]
+  const all = [...anomalyResults, ...concurrencyResults, ...allChecks]
   const failed = all.filter((r) => !r.pass)
   console.log('\n' + line())
   if (failed.length === 0) {
@@ -574,7 +592,13 @@ function printReport(anomalyResults, concurrencyResults, checks) {
 
     console.log('【一、连跑】')
     for (let i = 0; i < ROUNDS; i++) {
-      await runRound(i, ctx)
+      try {
+        await runRound(i, ctx)
+      } catch (e) {
+        // 单轮失败不中断：继续跑完，最后统一汇总（否则只能看到第一个失败点）
+        stats.failedRounds.push({ round: i + 1, error: e.message })
+        console.log(`  第 ${String(i + 1).padStart(2)} 轮 ✗ ${e.message}`)
+      }
     }
 
     console.log('\n【二、异常场景（可回滚）】')
