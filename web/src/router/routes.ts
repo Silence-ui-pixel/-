@@ -137,7 +137,8 @@ export const routes: AppRouteRecord[] = [
             name: 'inbound-putaway',
             component: () => import('@/views/inbound/putaway/index.vue'),
             meta: {
-              title: '上架作业',
+              // 上架执行在 PDA（/pda/inbound），此处只读核对货落在哪个库位
+              title: '上架进度',
               icon: 'Place',
               sort: 2,
               roles: ['ADMIN', 'MANAGER', 'OPERATOR'],
